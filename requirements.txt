@@ -1,0 +1,6 @@
+runpod
+openai-whisper
+google-generativeai
+requests
+apify-client
+torch
