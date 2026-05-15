@@ -1,6 +1,3 @@
 runpod
-openai-whisper
-google-generativeai
-requests
-apify-client
-torch
+yt-dlp
+moviepy==1.0.3

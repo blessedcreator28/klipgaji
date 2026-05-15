@@ -17,10 +17,15 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
       - name: Build and push
         uses: docker/build-push-action@v4
         with:
           context: .
           push: true
-          # INI KUNCINYA: Kita ganti jadi v2
-          tags: blessedcreator/jagoan-clipper:v2
+          # INI KUNCINYA: Kita ganti jadi v3
+          tags: blessedcreator/jagoan-clipper:v3
