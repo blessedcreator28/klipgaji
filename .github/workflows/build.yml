@@ -22,4 +22,5 @@ jobs:
         with:
           context: .
           push: true
-          tags: blessedcreator/jagoan-clipper:v1
+          # INI KUNCINYA: Kita ganti jadi v2
+          tags: blessedcreator/jagoan-clipper:v2
