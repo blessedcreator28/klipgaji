@@ -22,5 +22,4 @@ jobs:
         with:
           context: .
           push: true
-          # KITA PAKSA PAKAI TAG SEGAR V7
-          tags: blessedcreator/jagoan-clipper:v7-final
+          tags: blessedcreator/jagoan-clipper:v99-nuclear
