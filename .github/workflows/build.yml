@@ -22,5 +22,5 @@ jobs:
         with:
           context: .
           push: true
-          # INI KUNCINYA: Kita ganti jadi v4
-          tags: blessedcreator/jagoan-clipper:v4
+          # UPDATE KE V5
+          tags: blessedcreator/jagoan-clipper:v5
