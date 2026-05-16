@@ -1,16 +1,15 @@
 import runpod
 
-# Kunci akses RunPod lo
 runpod.api_key = "rpa_I4UJDB6G4QB0E6HJJBG3ZQJC1DRUS70A2NTXIDBPffi5bv"
 
-# ID MESIN V5 LO YANG BARU (Gue udah masukin)
-ENDPOINT_ID = "2e9mtheg7e8o7b"
+# INI ID V6 LO YANG BENAR!
+ENDPOINT_ID = "rcvmpej9vswrlj"
 
 def run_test():
-    print("🚀 SCRIPT DIMULAI (VERSI V5 - SUPABASE)...")
+    print("🚀 SCRIPT DIMULAI (VERSI V6 - THE FINAL TEST)...")
     
     try:
-        print(f"📡 Menghubungi Endpoint v5: {ENDPOINT_ID}...")
+        print(f"📡 Menghubungi Endpoint: {ENDPOINT_ID}...")
         endpoint = runpod.Endpoint(ENDPOINT_ID)
         
         input_data = {
@@ -22,12 +21,12 @@ def run_test():
         
         job = endpoint.run(input_data)
         print(f"⌛ Job terkirim! ID: {job.job_id}")
-        print("💡 Mesin v5 sedang memproses dan upload ke Supabase...")
-        print("⏳ Tunggu sebentar (sekitar 1-2 menit)...")
+        print("💡 Mesin sedang memproses dan upload ke Supabase...")
+        print("⏳ Sabar, jangan di-close. Ini butuh 1-2 menit...")
         
         output = job.output(timeout=600)
         
-        print("\n✅ BERHASIL! Ini link download dari Supabase:")
+        print("\n✅ THE REAL SUCCESS! Ini link download lo:")
         print("-" * 50)
         print(output)
         print("-" * 50)
