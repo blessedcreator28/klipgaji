@@ -12,6 +12,11 @@ BUCKET_NAME = "jagoan-videos"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# 🔥 KUNCI STRATEGIS: Load model di luar handler agar di-download SAAT INITIALIZING (Masa Biru)
+# Jadi ketika status IDLE, AI sudah standby di memori GPU, eksekusi kerjaan jadi super instan!
+print("🧠 Memuat model AI Whisper ke dalam memori GPU...")
+model = whisper.load_model("base")
+
 def handler(job):
     job_input = job['input']
     video_url = job_input.get("video_url")
@@ -48,9 +53,8 @@ def handler(job):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
 
-        # 2. PROSES AI WHISPER (Membaca Struktur Kalimat & Detik)
+        # 2. PROSES AI WHISPER (Eksekusi langsung di memori tanpa download lagi)
         print("🧠 AI Whisper mulai menganalisis audio pembicaraan...")
-        model = whisper.load_model("base")
         result = model.transcribe(download_path, word_timestamps=True)
         
         # 3. LOGIKA SMART CUTTING (30-60 Detik Tanpa Potong Kalimat)
