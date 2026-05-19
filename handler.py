@@ -12,8 +12,7 @@ BUCKET_NAME = "jagoan-videos"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 🔥 KUNCI STRATEGIS: Load model di luar handler agar di-download SAAT INITIALIZING (Masa Biru)
-# Jadi ketika status IDLE, AI sudah standby di memori GPU, eksekusi kerjaan jadi super instan!
+# Load model di luar handler agar di-download SAAT INITIALIZING (Masa Biru)
 print("🧠 Memuat model AI Whisper ke dalam memori GPU...")
 model = whisper.load_model("base")
 
@@ -40,10 +39,13 @@ def handler(job):
             'outtmpl': download_path,
             'noplaylist': True,
             'quiet': True,
+            # Kunci proxy berbayar lo
             'proxy': 'http://dipoveax:fjtpxd7e8buv@9.142.14.32:6688',
+            
+            # KUNCI MATI SMART TV ONLY (Tanpa campuran android/web penimbul bot)
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['tv', 'android'],
+                    'player_client': ['tv'],
                     'player_skip': ['webpage', 'configs'],
                 }
             },
@@ -53,7 +55,7 @@ def handler(job):
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
 
-        # 2. PROSES AI WHISPER (Eksekusi langsung di memori tanpa download lagi)
+        # 2. PROSES AI WHISPER
         print("🧠 AI Whisper mulai menganalisis audio pembicaraan...")
         result = model.transcribe(download_path, word_timestamps=True)
         
