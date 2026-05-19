@@ -1,8 +1,8 @@
 import runpod
 import os
+import yt_dlp
 import uuid
 import whisper
-from pytubefix import YouTube
 from moviepy.editor import VideoFileClip
 from supabase import create_client, Client
 
@@ -31,21 +31,30 @@ def handler(job):
     remote_filename = f"jagoan_smart_clip_{unique_id}.mp4"
 
     try:
-        print("⏳ Mendownload video dengan Pytubefix (Bypass PO Token) + IPRoyal...")
-        
-        # Konfigurasi Proxy IPRoyal Lo
-        proxy_url = "http://bIl7z9TWKeuVbf59:NINysowUyUr96J7a_country-us_session-tdeP3weK_lifetime-30m@geo.iproyal.com:12321"
-        proxies = {
-            "http": proxy_url,
-            "https": proxy_url
+        print("⏳ Mendownload video asli (Limit 720p + IPRoyal Fresh Session)...")
+        ydl_opts = {
+            # 🔥 Limit 720p agar file ringan dan proxy sanggup hajar tanpa Timeout
+            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
+            'outtmpl': download_path,
+            'noplaylist': True,
+            'quiet': True,
+            'cachedir': False,
+            
+            # 🔥 PROXY PRESISI FRESH 30 MENIT
+            'proxy': 'http://bIl7z9TWKeuVbf59:NINysowUyUr96J7a_country-us_session-FgzNBwr1_lifetime-30m@geo.iproyal.com:12321',
+            
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['tv'],
+                    'player_skip': ['webpage', 'configs'],
+                }
+            },
+            'geo_bypass': True,
+            'nocheckcertificate': True
         }
 
-        # Eksekusi download dengan PO Token Generator (Ini yang bikin YouTube gak minta login)
-        yt = YouTube(video_url, proxies=proxies, use_po_token=True)
-        
-        # Ambil resolusi MP4 standar (Sangat cepat dan optimal untuk di-crop vertikal 9:16 nanti)
-        stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
-        stream.download(output_path=temp_dir, filename=f"raw_{unique_id}.mp4")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            ydl.download([video_url])
 
         print("🧠 AI Whisper mulai menganalisis audio pembicaraan...")
         result = model.transcribe(download_path, word_timestamps=True)
@@ -85,14 +94,11 @@ def handler(job):
 
         return {
             "status": "success",
-            "message": "🔥 TUNTAS VIN! Mesin Pytubefix nembus tembok bot tanpa ampun!",
+            "message": "🔥 TUNTAS VIN! KTP IPRoyal + Limit Resolusi 720p sukses jebol tanpa Timeout!",
             "download_url": public_url,
             "text_detected": result.get("text", "")[:200] + "..."
         }
 
     except Exception as e:
         if os.path.exists(download_path): os.remove(download_path)
-        if os.path.exists(hasil_path): os.remove(hasil_path)
-        return {"status": "error", "message": str(e)}
-
-runpod.serverless.start({"handler": handler})
+        if os.path.exists(hasil_path): os.remove(hasil_
