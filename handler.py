@@ -29,8 +29,8 @@ def handler(job):
     hasil_path = os.path.join(temp_dir, f"clip_{unique_id}.mp4")
     remote_filename = f"jagoan_smart_clip_{unique_id}.mp4"
     
-    # 🔥 GANTI DENGAN LINK PROXY IPROYAL LO YANG PALING BARU (SESI FRESH)
-    PROXY_URL = 'PROXY_BARU_LO_DI_SINI'
+    # 🔥 PROXY IPROYAL FRESH (SESI: kyVEVYLU)
+    PROXY_URL = 'http://bIl7z9TWKeuVbf59:NINysowUyUr96J7a_country-us_session-kyVEVYLU_lifetime-30m@geo.iproyal.com:12321'
 
     try:
         # ==========================================
