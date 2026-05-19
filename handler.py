@@ -3,7 +3,6 @@ import os
 import yt_dlp
 import uuid
 import whisper
-from moviepy.editor import VideoFileClip
 from supabase import create_client, Client
 
 SUPABASE_URL = "https://dfqegfdehvpttslbzzjv.supabase.co"
@@ -22,46 +21,43 @@ def handler(job):
     if not video_url:
         return {"status": "error", "message": "Video URL tidak ditemukan!"}
 
-    print(f"📥 Memulai eksekusi SAAS JAGOAN CLIPPER untuk: {video_url}")
+    print(f"📥 Memulai eksekusi SAAS JAGOAN CLIPPER (Smart Partial) untuk: {video_url}")
     
     temp_dir = "/tmp"
     unique_id = str(uuid.uuid4())[:8]
-    download_path = os.path.join(temp_dir, f"raw_{unique_id}.mp4")
+    audio_path = os.path.join(temp_dir, f"audio_{unique_id}.m4a")
     hasil_path = os.path.join(temp_dir, f"clip_{unique_id}.mp4")
     remote_filename = f"jagoan_smart_clip_{unique_id}.mp4"
+    
+    # 🔥 GANTI DENGAN LINK PROXY IPROYAL LO YANG PALING BARU (SESI FRESH)
+    PROXY_URL = 'PROXY_BARU_LO_DI_SINI'
 
     try:
-        print("⏳ Mendownload video asli (Limit 720p + IPRoyal Fresh Session)...")
-        ydl_opts = {
-            # 🔥 Limit 720p agar file ringan dan proxy sanggup hajar tanpa Timeout
-            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
-            'outtmpl': download_path,
+        # ==========================================
+        # FASE 1: SEDOT AUDIO SAJA (Super Kilat)
+        # ==========================================
+        print("⏳ Fase 1: Mendownload Audio saja...")
+        audio_opts = {
+            'format': 'bestaudio[ext=m4a]/bestaudio',
+            'outtmpl': audio_path,
             'noplaylist': True,
             'quiet': True,
             'cachedir': False,
-            
-            # 🔥 PROXY PRESISI FRESH 30 MENIT
-            'proxy': 'http://bIl7z9TWKeuVbf59:NINysowUyUr96J7a_country-us_session-FgzNBwr1_lifetime-30m@geo.iproyal.com:12321',
-            
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['tv'],
-                    'player_skip': ['webpage', 'configs'],
-                }
-            },
+            'proxy': PROXY_URL,
+            'extractor_args': {'youtube': {'player_client': ['tv']}},
             'geo_bypass': True,
             'nocheckcertificate': True
         }
-
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+        with yt_dlp.YoutubeDL(audio_opts) as ydl:
             ydl.download([video_url])
 
-        print("🧠 AI Whisper mulai menganalisis audio pembicaraan...")
-        result = model.transcribe(download_path, word_timestamps=True)
+        # ==========================================
+        # FASE 2: ANALISA AI WHISPER
+        # ==========================================
+        print("🧠 Fase 2: AI Whisper menganalisis timestamps...")
+        result = model.transcribe(audio_path, word_timestamps=True)
         
-        print("✂️ Menghitung titik potong aman...")
         segments = result.get("segments", [])
-        
         start_time = 0.0
         end_time = 45.0
         
@@ -73,13 +69,34 @@ def handler(job):
                 break
             end_time = seg["end"]
 
-        print(f"🎬 Memotong dari detik {start_time} sampai {end_time}")
+        print(f"🎬 Hasil AI: Potongan viral dari detik {start_time} sampai {end_time}")
 
-        clip = VideoFileClip(download_path).subclip(start_time, end_time)
-        clip.write_videofile(hasil_path, codec="libx264", audio_codec="aac", logger=None)
-        clip.close()
+        # ==========================================
+        # FASE 3: SMART DOWNLOAD VIDEO (Langsung Potong dari Youtube)
+        # ==========================================
+        print("🚀 Fase 3: Smart Download Video! Hanya menyedot potongan klip...")
+        video_opts = {
+            'format': 'bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best',
+            'outtmpl': hasil_path,
+            'noplaylist': True,
+            'quiet': True,
+            'cachedir': False,
+            'proxy': PROXY_URL,
+            'extractor_args': {'youtube': {'player_client': ['tv']}},
+            'geo_bypass': True,
+            'nocheckcertificate': True,
+            
+            # FITUR SHORTCUT DEWA: Jangan download full, ambil rentang waktunya aja!
+            'download_ranges': lambda info, ydl: [(start_time, end_time)],
+            'force_keyframes_at_cuts': True
+        }
+        with yt_dlp.YoutubeDL(video_opts) as ydl:
+            ydl.download([video_url])
 
-        print("🚀 Uploading ke Supabase...")
+        # ==========================================
+        # FASE 4: UPLOAD KE SUPABASE
+        # ==========================================
+        print("☁️ Fase 4: Uploading ke Supabase...")
         with open(hasil_path, 'rb') as f:
             supabase.storage.from_(BUCKET_NAME).upload(
                 file=f,
@@ -89,16 +106,20 @@ def handler(job):
 
         public_url = supabase.storage.from_(BUCKET_NAME).get_public_url(remote_filename)
 
-        if os.path.exists(download_path): os.remove(download_path)
+        # BERSIH-BERSIH SERVER
+        if os.path.exists(audio_path): os.remove(audio_path)
         if os.path.exists(hasil_path): os.remove(hasil_path)
 
         return {
             "status": "success",
-            "message": "🔥 TUNTAS VIN! KTP IPRoyal + Limit Resolusi 720p sukses jebol tanpa Timeout!",
+            "message": "🔥 TUNTAS VIN! Arsitektur Smart Partial sukses bypass Timeout!",
             "download_url": public_url,
             "text_detected": result.get("text", "")[:200] + "..."
         }
 
     except Exception as e:
-        if os.path.exists(download_path): os.remove(download_path)
-        if os.path.exists(hasil_path): os.remove(hasil_
+        if os.path.exists(audio_path): os.remove(audio_path)
+        if os.path.exists(hasil_path): os.remove(hasil_path)
+        return {"status": "error", "message": str(e)}
+
+runpod.serverless.start({"handler": handler})
