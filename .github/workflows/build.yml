@@ -22,4 +22,4 @@ jobs:
         with:
           context: .
           push: true
-          tags: blessedcreator/jagoan-clipper:v99-nuclear
+          tags: blessedcreator/jagoan-clipper:v111
