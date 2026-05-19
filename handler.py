@@ -1,8 +1,8 @@
 import runpod
 import os
-import yt_dlp
 import uuid
 import whisper
+from pytubefix import YouTube
 from moviepy.editor import VideoFileClip
 from supabase import create_client, Client
 
@@ -31,29 +31,21 @@ def handler(job):
     remote_filename = f"jagoan_smart_clip_{unique_id}.mp4"
 
     try:
-        print("⏳ Mendownload video asli dengan Residential Proxy...")
-        ydl_opts = {
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
-            'outtmpl': download_path,
-            'noplaylist': True,
-            'quiet': True,
-            'cachedir': False,
-            
-            # 🔥 PROXY PRESISI 100% HASIL COPAS (Udah gue ekstrak dari tulisan curl lo)
-            'proxy': 'http://bIl7z9TWKeuVbf59:NINysowUyUr96J7a_country-us_session-tdeP3weK_lifetime-30m@geo.iproyal.com:12321',
-            
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['tv', 'web_creator'],
-                    'player_skip': ['webpage', 'configs'],
-                }
-            },
-            'geo_bypass': True,
-            'nocheckcertificate': True
+        print("⏳ Mendownload video dengan Pytubefix (Bypass PO Token) + IPRoyal...")
+        
+        # Konfigurasi Proxy IPRoyal Lo
+        proxy_url = "http://bIl7z9TWKeuVbf59:NINysowUyUr96J7a_country-us_session-tdeP3weK_lifetime-30m@geo.iproyal.com:12321"
+        proxies = {
+            "http": proxy_url,
+            "https": proxy_url
         }
 
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video_url])
+        # Eksekusi download dengan PO Token Generator (Ini yang bikin YouTube gak minta login)
+        yt = YouTube(video_url, proxies=proxies, use_po_token=True)
+        
+        # Ambil resolusi MP4 standar (Sangat cepat dan optimal untuk di-crop vertikal 9:16 nanti)
+        stream = yt.streams.filter(progressive=True, file_extension='mp4').order_by('resolution').desc().first()
+        stream.download(output_path=temp_dir, filename=f"raw_{unique_id}.mp4")
 
         print("🧠 AI Whisper mulai menganalisis audio pembicaraan...")
         result = model.transcribe(download_path, word_timestamps=True)
@@ -93,7 +85,7 @@ def handler(job):
 
         return {
             "status": "success",
-            "message": "🔥 TUNTAS VIN! Residential Proxy nembus tanpa ampun!",
+            "message": "🔥 TUNTAS VIN! Mesin Pytubefix nembus tembok bot tanpa ampun!",
             "download_url": public_url,
             "text_detected": result.get("text", "")[:200] + "..."
         }
