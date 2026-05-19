@@ -27,9 +27,8 @@ def handler(job):
     remote_filename = f"jagoan_clip_{unique_id}.mp4"
 
     try:
-        print("⏳ Mendownload video asli dengan senjata Anti-Bot...")
+        print("⏳ Mendownload video asli via Proxy Berbayar + TV Bypass...")
         
-        # KONFIGURASI PREMIUM ANTI-CEKAL YOUTUBE
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': download_path,
@@ -37,23 +36,15 @@ def handler(job):
             'quiet': False,
             'no_warnings': False,
             
-            # 1. Suntik Proxy Premium Otomatis
-            'proxy': os.getenv("PROXY_URL", None),
+            # 1. KUNCI PROXY BERBAYAR WEBSHARE (Pondasi Utama Anti-Bot)
+            'proxy': 'http://dipoveax:fjtpxd7e8buv@9.142.14.32:6688',
             
-            # 2. Penyamaran Mobile Client (Kunci Utama Bebas Cekal)
+            # 2. PENYAMARAN SMART TV CLIENT
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['ios', 'android'],
-                    'skip': ['webpage', 'authcheck'],
+                    'player_client': ['tv'],
+                    'player_skip': ['webpage', 'configs'],
                 }
-            },
-            
-            # 3. Header Safari iPhone Asli
-            'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Cache-Control': 'no-cache',
             },
             'geo_bypass': True
         }
