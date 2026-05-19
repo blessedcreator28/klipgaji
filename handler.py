@@ -22,7 +22,7 @@ def handler(job):
     if not video_url:
         return {"status": "error", "message": "Video URL tidak ditemukan!"}
 
-    print(f"📥 Memulai eksekusi SAAS JAGOAN CLIPPER (RESIDENTIAL PROXY) untuk: {video_url}")
+    print(f"📥 Memulai eksekusi SAAS JAGOAN CLIPPER untuk: {video_url}")
     
     temp_dir = "/tmp"
     unique_id = str(uuid.uuid4())[:8]
@@ -31,16 +31,16 @@ def handler(job):
     remote_filename = f"jagoan_smart_clip_{unique_id}.mp4"
 
     try:
-        print("⏳ Mendownload video asli dengan KTP Manusia (IPRoyal)...")
+        print("⏳ Mendownload video asli dengan Residential Proxy...")
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': download_path,
             'noplaylist': True,
             'quiet': True,
-            'cachedir': False, # Matikan ingatan cache bot
+            'cachedir': False,
             
-            # 🔥 SENJATA UTAMA KITA MALAM INI: Residential Proxy IPRoyal
-            'proxy': 'http://bll7z9TWKeuVbf59:NlNysowUyUr96J7a_country-us_session-tdeP3weK_lifetime-30m@geo.iproyal.com:12321',
+            # 🔥 PROXY PRESISI 100% HASIL COPAS (Udah gue ekstrak dari tulisan curl lo)
+            'proxy': 'http://bIl7z9TWKeuVbf59:NINysowUyUr96J7a_country-us_session-tdeP3weK_lifetime-30m@geo.iproyal.com:12321',
             
             'extractor_args': {
                 'youtube': {
