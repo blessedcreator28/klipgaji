@@ -1,5 +1,5 @@
 runpod
+yt-dlp
+openai-whisper
 moviepy
 supabase
-openai-whisper
-pytubefix
