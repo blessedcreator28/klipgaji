@@ -12,7 +12,6 @@ BUCKET_NAME = "jagoan-videos"
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# Load model di luar handler agar di-download SAAT INITIALIZING (Masa Biru)
 print("🧠 Memuat model AI Whisper ke dalam memori GPU...")
 model = whisper.load_model("base")
 
@@ -23,7 +22,7 @@ def handler(job):
     if not video_url:
         return {"status": "error", "message": "Video URL tidak ditemukan!"}
 
-    print(f"📥 Memulai eksekusi JAGOAN CLIPPER SMART CUT untuk: {video_url}")
+    print(f"📥 Memulai eksekusi SAAS JAGOAN CLIPPER (RESIDENTIAL PROXY) untuk: {video_url}")
     
     temp_dir = "/tmp"
     unique_id = str(uuid.uuid4())[:8]
@@ -32,34 +31,33 @@ def handler(job):
     remote_filename = f"jagoan_smart_clip_{unique_id}.mp4"
 
     try:
-        # 1. DOWNLOAD VIDEO VIA PROXY WEBSHARE
-        print("⏳ Mendownload video asli...")
+        print("⏳ Mendownload video asli dengan KTP Manusia (IPRoyal)...")
         ydl_opts = {
             'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'outtmpl': download_path,
             'noplaylist': True,
             'quiet': True,
-            # Kunci proxy berbayar lo
-            'proxy': 'http://dipoveax:fjtpxd7e8buv@9.142.14.32:6688',
+            'cachedir': False, # Matikan ingatan cache bot
             
-            # KUNCI MATI SMART TV ONLY (Tanpa campuran android/web penimbul bot)
+            # 🔥 SENJATA UTAMA KITA MALAM INI: Residential Proxy IPRoyal
+            'proxy': 'http://bll7z9TWKeuVbf59:NlNysowUyUr96J7a_country-us_session-tdeP3weK_lifetime-30m@geo.iproyal.com:12321',
+            
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['tv'],
+                    'player_client': ['tv', 'web_creator'],
                     'player_skip': ['webpage', 'configs'],
                 }
             },
-            'geo_bypass': True
+            'geo_bypass': True,
+            'nocheckcertificate': True
         }
 
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([video_url])
 
-        # 2. PROSES AI WHISPER
         print("🧠 AI Whisper mulai menganalisis audio pembicaraan...")
         result = model.transcribe(download_path, word_timestamps=True)
         
-        # 3. LOGIKA SMART CUTTING (30-60 Detik Tanpa Potong Kalimat)
         print("✂️ Menghitung titik potong aman...")
         segments = result.get("segments", [])
         
@@ -74,15 +72,13 @@ def handler(job):
                 break
             end_time = seg["end"]
 
-        print(f"🎬 Hasil Analisis AI: Memotong dari detik {start_time} sampai {end_time}")
+        print(f"🎬 Memotong dari detik {start_time} sampai {end_time}")
 
-        # 4. EKSEKUSI PEMOTONGAN VIDEO
         clip = VideoFileClip(download_path).subclip(start_time, end_time)
         clip.write_videofile(hasil_path, codec="libx264", audio_codec="aac", logger=None)
         clip.close()
 
-        # 5. UPLOAD KE SUPABASE
-        print("🚀 Uploading hasil potongan pintar ke Supabase...")
+        print("🚀 Uploading ke Supabase...")
         with open(hasil_path, 'rb') as f:
             supabase.storage.from_(BUCKET_NAME).upload(
                 file=f,
@@ -97,7 +93,7 @@ def handler(job):
 
         return {
             "status": "success",
-            "message": "🔥 BOOM! Smart Cutting Berhasil, Vin! Pembicaraan tidak terputus!",
+            "message": "🔥 TUNTAS VIN! Residential Proxy nembus tanpa ampun!",
             "download_url": public_url,
             "text_detected": result.get("text", "")[:200] + "..."
         }
