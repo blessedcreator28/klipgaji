@@ -1,6 +1,5 @@
 runpod
 requests
-openai-whisper
 supabase
-torch
 numpy
+openai-whisper
