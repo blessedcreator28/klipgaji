@@ -1,17 +1,16 @@
-# Image ini sudah berisi PyTorch dan CUDA, jadi tidak perlu install torch lagi
-FROM runpod/pytorch:2.2.0-py3.10-cuda12.1.0-devel-ubuntu22.04
+FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 
-# Install sistem dependensi yang ringan saja
 RUN apt-get update && apt-get install -y \
+    python3-pip \
     ffmpeg \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install sisanya (tanpa torch, karena sudah ada di image)
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy handler
 COPY handler.py .
 
 CMD ["python3", "-u", "handler.py"]
