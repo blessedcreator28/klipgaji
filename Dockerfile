@@ -1,18 +1,13 @@
-FROM python:3.10-slim
+FROM runpod/pytorch:2.2.0-py3.10-cuda12.1.0-devel-ubuntu22.04
 
-# Install ffmpeg (Wajib buat moviepy)
-RUN apt-get update && \
-    apt-get install -y ffmpeg && \
-    rm -rf /var/lib/apt/lists/*
+# Install FFmpeg
+RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
-
-# Copy daftar alat dan install
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy semua kodingan lo
-COPY . .
+# Copy handler
+COPY handler.py .
 
-# Jalankan mesin
-CMD ["python", "-u", "handler.py"]
+CMD ["python3", "-u", "handler.py"]
