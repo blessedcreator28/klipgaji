@@ -1,6 +1,6 @@
 import runpod
 import os
-import yt_dlp
+import requests
 import uuid
 import whisper
 from supabase import create_client
@@ -17,28 +17,46 @@ def handler(job):
     video_path = os.path.join(temp_dir, f"video_{unique_id}.mp4")
 
     try:
-        # 1. DOWNLOAD (Clean & Simple)
-        ydl_opts = {
-            'format': 'bestvideo[height<=720]+bestaudio/best[height<=720]/best',
-            'outtmpl': video_path,
-            'quiet': True,
-            'nocheckcertificate': True
+        # 1. TEMBUSIN YOUTUBE PAKE COBALT API
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/json"
         }
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([video_url])
+        payload = {
+            "url": video_url,
+            "videoQuality": "720" # Dibatasi 720p biar proses AI lebih ngebut
+        }
+        
+        # Minta direct link ke Cobalt
+        cobalt_res = requests.post("https://api.cobalt.tools/api/json", json=payload, headers=headers)
+        cobalt_data = cobalt_res.json()
+        
+        if cobalt_data.get("status") == "error":
+            return {"status": "manual_upload_needed", "message": "Video ini terproteksi hak cipta tinggi. Silakan upload file manual."}
+            
+        direct_url = cobalt_data.get("url")
+        if not direct_url:
+            return {"status": "error", "message": "Gagal mendapatkan akses video dari YouTube."}
 
-        # 2. TRANSCRIBE (1x Proses saja)
+        # 2. DOWNLOAD FILE MENTAH (Sangat Cepat, Bebas Blokir)
+        r = requests.get(direct_url, stream=True)
+        with open(video_path, 'wb') as f:
+            for chunk in r.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        # 3. TRANSCRIBE (1x Proses)
         result = model.transcribe(video_path, word_timestamps=True)
         
-        # 3. SMART FILTER: Ambil Top 15 segment (15-60 detik)
+        # 4. SMART FILTER: Ambil Top 15 segment (15-60 detik)
         segments = [s for s in result['segments'] if 15 <= (s['end'] - s['start']) <= 60]
         top_segments = sorted(segments, key=lambda x: (x['end'] - x['start']), reverse=True)[:15]
         
-        # 4. PROSES KLIP
+        # 5. PROSES KLIP (FFmpeg Cut & Upload)
         processed_urls = []
         for i, seg in enumerate(top_segments):
             clip_path = f"/tmp/clip_{unique_id}_{i}.mp4"
-            # FFmpeg cut
+            
+            # Potong video
             os.system(f"ffmpeg -i {video_path} -ss {seg['start']} -to {seg['end']} -c copy {clip_path} -y")
             
             # Upload ke Supabase
@@ -52,9 +70,6 @@ def handler(job):
         return {"status": "success", "urls": processed_urls}
 
     except Exception as e:
-        error_msg = str(e)
-        if "Sign in" in error_msg or "DRM" in error_msg or "private" in error_msg:
-            return {"status": "manual_upload_needed", "message": "Video ini terproteksi/butuh sign-in. Silakan upload file manual."}
-        return {"status": "error", "message": error_msg}
+        return {"status": "error", "message": str(e)}
 
 runpod.serverless.start({"handler": handler})
