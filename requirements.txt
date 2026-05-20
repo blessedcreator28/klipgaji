@@ -2,4 +2,4 @@ runpod
 requests
 supabase
 numpy
-openai-whisper
+streamlit
