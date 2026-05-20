@@ -1,5 +1,6 @@
 runpod
-yt-dlp
+requests
 openai-whisper
-moviepy
 supabase
+torch
+numpy
