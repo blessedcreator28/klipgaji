@@ -1,37 +1,35 @@
 import streamlit as st
-import requests
-import time
+import os
+from supabase import create_client
 
-# Konfigurasi Endpoint RunPod
-RUNPOD_ENDPOINT_ID = "mj3o3oohv9up54"
-RUNPOD_API_KEY = st.secrets["RUNPOD_API_KEY"] # Kita pakai Secrets biar aman
+# Konfigurasi
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 st.set_page_config(page_title="Jagoan Clipper", layout="centered")
 st.title("🔥 Jagoan Clipper Web")
 
-video_url = st.text_input("Masukkan Link Video (MP4/Direct Link):")
+# Blokir Link, Fokus Upload
+st.write("Silakan upload video lo di bawah:")
+uploaded_file = st.file_uploader("Pilih file video (MP4)", type=['mp4', 'mov'])
 
-if st.button("Generate Klip"):
-    if video_url:
-        with st.spinner("Mesin lagi ngebut, tunggu bentar..."):
-            try:
-                # Kirim request ke RunPod
-                url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/runsync"
-                headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
-                payload = {"input": {"video_url": video_url}}
-                
-                response = requests.post(url, json=payload, headers=headers)
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    st.success("✅ Klip berhasil dibuat!")
-                    for i, clip_url in enumerate(data.get("output", {}).get("urls", [])):
-                        st.video(clip_url)
-                        st.write(f"Klip {i+1}: {clip_url}")
-                else:
-                    st.error(f"Error: {response.text}")
-                    
-            except Exception as e:
-                st.error(f"System Error: {e}")
-    else:
-        st.warning("Masukkan link videonya dulu bro!")
+if uploaded_file is not None:
+    if st.button("Generate Klip"):
+        with st.spinner("Lagi upload ke sistem..."):
+            # Upload ke Supabase Storage (Bucket 'videos')
+            file_name = uploaded_file.name
+            data = supabase.storage.from_("videos").upload(
+                path=file_name,
+                file=uploaded_file.getvalue(),
+                file_options={"content-type": "video/mp4"}
+            )
+            
+            # Ambil Public URL
+            public_url = supabase.storage.from_("videos").get_public_url(file_name)
+            st.success(f"Video berhasil diupload! Link: {public_url}")
+            
+            # Nanti di Step 2 kita sambungin ke RunPod pakai link ini
+            st.info("Sekarang tinggal kita lempar ke RunPod. (Lanjut ke Step 2 nanti)")
+else:
+    st.warning("Link input tidak tersedia. Gunakan fitur upload di atas.")
