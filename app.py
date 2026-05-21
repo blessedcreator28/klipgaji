@@ -33,34 +33,54 @@ if uploaded_file is not None:
                 st.error(f"Gagal upload ke database: {e}")
                 st.stop()
         
-        with st.spinner("Video sukses diupload! Sekarang AI lagi proses potong video..."):
+        # --- PERBAIKAN: SISTEM POLLING (NGECEK BERKALA) ---
+        with st.spinner("Video sukses diupload! AI lagi proses (Bisa makan waktu 1-3 menit)..."):
             try:
-                runpod_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/runsync"
+                # 1. Tembak RunPod pakai /run (Bukan runsync)
+                runpod_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run"
                 headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
                 payload = {"input": {"video_url": public_url}}
                 
                 response = requests.post(runpod_url, json=payload, headers=headers)
                 
                 if response.status_code == 200:
-                    data = response.json()
+                    job_data = response.json()
+                    job_id = job_data.get("id")
                     
-                    # --- PERBAIKAN: BONGKAR SEMUA RESPONSE ---
-                    if data.get("status") == "COMPLETED":
-                        output_data = data.get("output", {})
-                        if output_data.get("status") == "success":
-                            st.success("✅ Klip berhasil dibuat!")
-                            clips = output_data.get("urls", [])
-                            for i, clip_url in enumerate(clips):
-                                st.write(f"🎬 **Klip {i+1}**")
-                                st.video(clip_url)
+                    # 2. Cek status terus-menerus sampai COMPLETED
+                    status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
+                    
+                    while True:
+                        status_resp = requests.get(status_url, headers=headers)
+                        if status_resp.status_code == 200:
+                            status_data = status_resp.json()
+                            status = status_data.get("status")
+                            
+                            if status == "COMPLETED":
+                                output_data = status_data.get("output", {})
+                                if output_data.get("status") == "success":
+                                    st.success("✅ Klip berhasil dibuat!")
+                                    clips = output_data.get("urls", [])
+                                    for i, clip_url in enumerate(clips):
+                                        st.write(f"🎬 **Klip {i+1}**")
+                                        st.video(clip_url)
+                                    st.write("Preview Whisper:", output_data.get("transcription", ""))
+                                else:
+                                    st.error(f"Error dari mesin AI:\n{output_data}")
+                                break # Keluar dari loop
+                            
+                            elif status in ["FAILED", "CANCELLED"]:
+                                st.error(f"RunPod Gagal: {status_data}")
+                                break # Keluar dari loop
+                            
+                            else:
+                                # Kalau IN_QUEUE / IN_PROGRESS, tunggu 3 detik lalu cek lagi
+                                time.sleep(3) 
                         else:
-                            # Kalau AI ngirim error dari handler.py
-                            st.error(f"Error dari dalam mesin AI:\n{output_data}")
-                    else:
-                        # Kalau RunPod yang gagal (misal out of memory/crash)
-                        st.error(f"RunPod Crash! Ini pesan aslinya:\n{data}")
+                            st.error("Gagal ngecek status ke RunPod.")
+                            break
                 else:
-                    st.error(f"Koneksi RunPod Gagal: {response.text}")
+                    st.error(f"Koneksi awal RunPod Gagal: {response.text}")
                     
             except Exception as e:
                 st.error(f"System Error: {e}")
