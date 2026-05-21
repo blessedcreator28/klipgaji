@@ -24,7 +24,7 @@ def handler(job):
 
         unique_id = str(uuid.uuid4())[:8]
         video_path = f"/tmp/input_{unique_id}.mp4"
-        output_filename = f"clip_{unique_id}.mp4"
+        output_filename = f"blur_{unique_id}.mp4"
         output_path = f"/tmp/{output_filename}"
 
         # 1. Download Video
@@ -37,48 +37,24 @@ def handler(job):
         result = model.transcribe(video_path)
         segments = result.get("segments", [])
         
-        # --- LOGIKA BARU: BLINDFOLD INTRO ---
-        # Kata-kata provokatif tapi profesional untuk nangkep audiens lokal
-        hook_keywords = [
-            "rahasia", "bongkar", "fatal", "strategi", "terbukti", 
-            "jangan sampai", "alasan", "kenapa", "fakta", "bayangin", 
-            "perhatikan", "dengerin", "stop"
-        ]
-        
-        start_index = 0
+        # Penentuan waktu potong (Gunakan logika blindfold 15 detik sebelumnya)
         start_time = 0.0
         end_time = 0.0
-        clip_text = ""
-
         if segments:
-            # 1. Paksa lewati 15 detik pertama (Biar thumbnail/intro ke-skip)
             for i, seg in enumerate(segments):
                 if seg["start"] >= 15.0:
-                    text_lower = seg["text"].lower()
-                    # 2. Baru cari hook viral setelah intro lewat
-                    if any(kw in text_lower for kw in hook_keywords):
-                        start_index = i
-                        break
-            
-            # 3. Kalau udah dilewati 15 detik tapi ga ada kata hook satupun, 
-            # potong paksa persis dari detik ke-15 aja.
-            if start_index == 0:
-                for i, seg in enumerate(segments):
-                    if seg["start"] >= 15.0:
-                        start_index = i
-                        break
-
-            # Mulai merangkai klip
+                    start_index = i
+                    break
+            if 'start_index' not in locals():
+                start_index = 0
+                
             current_start = segments[start_index]["start"]
             for seg in segments[start_index:]:
-                clip_text += seg["text"] + " "
                 duration = seg["end"] - current_start
-                
                 if duration >= 30:
                     end_time = seg["end"]
                     start_time = current_start
                     break
-            
             if end_time == 0.0:
                 start_time = segments[start_index]["start"]
                 end_time = segments[-1]["end"]
@@ -86,16 +62,20 @@ def handler(job):
             end_time = 30.0
 
         duration_to_cut = end_time - start_time
-        
-        # 4. Potong pakai FFmpeg
+
+        # 3. PROSES FFMPEG: POTONG + UBAH PORTRAIT + BLUR ATAS BAWAH
+        # -ss dan -t ditaruh di depan -i agar proses pemotongan super cepat sebelum masuk ke filter visual
         ffmpeg_cmd = [
-            "ffmpeg", "-y", "-i", video_path, 
+            "ffmpeg", "-y", 
             "-ss", str(start_time), "-t", str(duration_to_cut), 
-            "-c:v", "libx264", "-c:a", "aac", output_path
+            "-i", video_path,
+            "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:10[bg];[0:v]scale=1080:-2[fg];[bg][fg]overlay=0:(H-h)/2",
+            "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", 
+            output_path
         ]
         subprocess.run(ffmpeg_cmd, check=True)
 
-        # 5. Upload Hasil ke Supabase
+        # 4. Upload Hasil ke Supabase
         with open(output_path, "rb") as f:
             supabase.storage.from_("videos").upload(
                 path=output_filename,
@@ -111,7 +91,7 @@ def handler(job):
         return {
             "status": "success", 
             "urls": [clip_url],
-            "transcription": clip_text.strip()
+            "transcription": result.get("text", "")[:100]
         }
 
     except Exception as e:
