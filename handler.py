@@ -6,16 +6,6 @@ import traceback
 import subprocess
 import random
 
-def format_time(t):
-    h = int(t // 3600)
-    m = int((t % 3600) // 60)
-    s = int(t % 60)
-    ms = int(round((t % 1) * 1000))
-    if ms >= 1000:
-        s += 1
-        ms -= 1000
-    return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
-
 def handler(job):
     try:
         import whisper
@@ -25,6 +15,8 @@ def handler(job):
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmcWVnZmRlaHZwdHRzbGJ6emp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTQwOTgsImV4cCI6MjA5MzI3MDA5OH0.QhklGaVToBBwesBcXh-Y34RRGQSL9EKU7CfYbDJzvC0"
 
         supabase = create_client(supabase_url, supabase_key)
+        
+        # Whisper small untuk akurasi bahasa Indonesia
         model = whisper.load_model("small")
 
         job_input = job.get('input', {})
@@ -35,14 +27,14 @@ def handler(job):
 
         unique_id = str(uuid.uuid4())[:8]
         video_path = f"/tmp/input_{unique_id}.mp4"
-        srt_path = f"/tmp/subs_{unique_id}.srt"
         output_filename = f"final_{unique_id}.mp4"
         output_path = f"/tmp/{output_filename}"
 
-        # --- DOWNLOAD THE BOLD FONT ---
+        # --- SISTEM INJEKSI THE BOLD FONT ---
         font_url = "https://raw.githubusercontent.com/LonamiWebs/8-Bally-Pool/master/src/Resources/Original/font/theboldfont.ttf"
         font_path = "/tmp/theboldfont.ttf"
         
+        # Download font kalau belum ada di mesin
         if not os.path.exists(font_path):
             r_font = requests.get(font_url, stream=True)
             with open(font_path, 'wb') as f:
@@ -55,21 +47,19 @@ def handler(job):
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        # 2. Transcribe
+        # 2. Transcribe Paksa Bahasa Indonesia
         result = model.transcribe(video_path, language="id", word_timestamps=True, fp16=False)
         
         target_dur = random.randint(30, 60)
         start_time = 15.0
         end_time = start_time + target_dur
         
-        # 3. Merakit File SRT Dinamis Per Kata
-        srt_content = ""
-        sub_index = 1
-        
+        # 3. Rangkai Filter Drawtext Per Kata
+        drawtexts = []
         for seg in result.get("segments", []):
             words = seg.get("words", [])
             
-            # Fallback jika timestamp kosong
+            # Kalau timestamps kosong, pakai algoritma matematis
             if not words:
                 text = seg.get("text", "").strip()
                 word_list = text.split()
@@ -87,6 +77,7 @@ def handler(job):
                 w_start = w_info["start"]
                 w_end = w_info["end"]
 
+                # Ambil kata yang masuk durasi potong
                 if w_end > start_time and w_start < end_time:
                     rel_start = max(0.0, w_start - start_time)
                     rel_end = min(float(target_dur), w_end - start_time)
@@ -94,25 +85,20 @@ def handler(job):
                     if rel_end > rel_start:
                         clean_word = "".join(c for c in w_info['word'] if c.isalnum() or c in ".,?!").upper()
                         if clean_word:
-                            srt_content += f"{sub_index}\n"
-                            srt_content += f"{format_time(rel_start)} --> {format_time(rel_end)}\n"
-                            srt_content += f"{clean_word}\n\n"
-                            sub_index += 1
+                            # INJEKSI FONT LANGSUNG KE FILE .TTF
+                            dt = f"drawtext=fontfile='{font_path}':text='{clean_word}':fontcolor=yellow:fontsize=120:borderw=8:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2+350:enable='between(t,{rel_start},{rel_end})'"
+                            drawtexts.append(dt)
 
-        with open(srt_path, "w", encoding="utf-8") as f:
-            f.write(srt_content)
+        # 4. Bangun Arsitektur Filter Visual (Portrait Blur + Drawtext)
+        base_filter = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:10[bg];[0:v]scale=1080:-2[fg];[bg][fg]overlay=0:(H-h)/2"
+        
+        if drawtexts:
+            dt_chain = ",".join(drawtexts)
+            filter_complex = f"{base_filter}[merged];[merged]{dt_chain}"
+        else:
+            filter_complex = base_filter
 
-        # 4. FFMPEG dengan Subtitles dan fontsdir (SUPER CEPAT)
-        # FontName diarahkan langsung ke internal nama font tersebut
-        style = "FontName=The Bold Font,FontSize=110,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=5,Shadow=0,Alignment=2,MarginV=350"
-        
-        filter_complex = (
-            "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:10[bg];"
-            "[0:v]scale=1080:-2[fg];"
-            "[bg][fg]overlay=0:(H-h)/2[merged];"
-            f"[merged]subtitles='{srt_path}':fontsdir='/tmp':force_style='{style}'"
-        )
-        
+        # 5. Eksekusi FFmpeg
         ffmpeg_cmd = [
             "ffmpeg", "-y", 
             "-ss", str(start_time), "-t", str(target_dur), 
@@ -123,7 +109,7 @@ def handler(job):
         ]
         subprocess.run(ffmpeg_cmd, check=True)
 
-        # 5. Upload & Cleanup
+        # 6. Upload & Cleanup
         with open(output_path, "rb") as f:
             supabase.storage.from_("videos").upload(path=output_filename, file=f)
         
@@ -131,7 +117,6 @@ def handler(job):
 
         os.remove(video_path)
         os.remove(output_path)
-        os.remove(srt_path)
 
         return {"status": "success", "urls": [clip_url]}
 
