@@ -15,8 +15,6 @@ def handler(job):
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmcWVnZmRlaHZwdHRzbGJ6emp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTQwOTgsImV4cCI6MjA5MzI3MDA5OH0.QhklGaVToBBwesBcXh-Y34RRGQSL9EKU7CfYbDJzvC0"
 
         supabase = create_client(supabase_url, supabase_key)
-        
-        # Pakai 'small' dan lock bahasa Indonesia biar gak halusinasi
         model = whisper.load_model("small")
 
         job_input = job.get('input', {})
@@ -30,25 +28,34 @@ def handler(job):
         output_filename = f"final_{unique_id}.mp4"
         output_path = f"/tmp/{output_filename}"
 
+        # --- SISTEM INJEKSI FONT OTOMATIS ---
+        font_url = "https://raw.githubusercontent.com/LonamiWebs/8-Bally-Pool/master/src/Resources/Original/font/theboldfont.ttf"
+        font_path = "/tmp/theboldfont.ttf"
+        
+        if not os.path.exists(font_path):
+            r_font = requests.get(font_url, stream=True)
+            with open(font_path, 'wb') as f:
+                for chunk in r_font.iter_content(chunk_size=8192):
+                    f.write(chunk)
+
         # 1. Download Video
         r = requests.get(video_url, stream=True)
         with open(video_path, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        # 2. Transcribe (Paksa akurasi kata)
+        # 2. Transcribe (Akurasi Tinggi Bahasa Indonesia)
         result = model.transcribe(video_path, language="id", word_timestamps=True, fp16=False)
         
         target_dur = random.randint(30, 60)
         start_time = 15.0
         end_time = start_time + target_dur
         
-        # 3. Ekstrak Timestamps & Bikin Rantai Drawtext (Tanpa file SRT!)
+        # 3. Ekstrak Timestamps & Build Drawtext Chain
         drawtexts = []
         for seg in result.get("segments", []):
             words = seg.get("words", [])
             
-            # Jika AI gagal narik kata, pakai algoritma pecah matematis otomatis
             if not words:
                 text = seg.get("text", "").strip()
                 word_list = text.split()
@@ -66,17 +73,15 @@ def handler(job):
                 w_start = w_info["start"]
                 w_end = w_info["end"]
 
-                # Pastikan kata ada di dalam durasi video yang dipotong
                 if w_end > start_time and w_start < end_time:
                     rel_start = max(0.0, w_start - start_time)
                     rel_end = min(float(target_dur), w_end - start_time)
 
                     if rel_end > rel_start:
-                        # Bersihkan simbol penyebab error render
                         clean_word = "".join(c for c in w_info['word'] if c.isalnum() or c in ".,?!").upper()
                         if clean_word:
-                            # Injeksi drawtext dinamis per kata
-                            dt = f"drawtext=text='{clean_word}':fontcolor=yellow:fontsize=120:borderw=8:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2+350:enable='between(t,{rel_start},{rel_end})'"
+                            # Terapkan TheBoldFont ke setiap kata
+                            dt = f"drawtext=fontfile='{font_path}':text='{clean_word}':fontcolor=yellow:fontsize=120:borderw=8:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2+350:enable='between(t,{rel_start},{rel_end})'"
                             drawtexts.append(dt)
 
         # 4. Bangun Arsitektur Filter Visual
@@ -103,14 +108,4 @@ def handler(job):
         with open(output_path, "rb") as f:
             supabase.storage.from_("videos").upload(path=output_filename, file=f)
         
-        clip_url = supabase.storage.from_("videos").get_public_url(output_filename)
-
-        os.remove(video_path)
-        os.remove(output_path)
-
-        return {"status": "success", "urls": [clip_url]}
-
-    except Exception as e:
-        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
-
-runpod.serverless.start({"handler": handler})
+        clip_
