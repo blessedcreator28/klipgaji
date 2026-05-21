@@ -4,9 +4,10 @@ import requests
 import time
 from supabase import create_client
 
-SUPABASE_URL = st.secrets["SUPABASE_URL"]
-SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
-RUNPOD_API_KEY = st.secrets["RUNPOD_API_KEY"]
+# Kunci & URL langsung ditempel di sini
+SUPABASE_URL = "https://dfqegfdehvpttslbzzjv.supabase.co"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmcWVnZmRlaHZwdHRzbGJ6emp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTQwOTgsImV4cCI6MjA5MzI3MDA5OH0.QhklGaVToBBwesBcXh-Y34RRGQSL9EKU7CfYbDJzvC0"
+RUNPOD_API_KEY = "rpa_I4UJDB6G4QB0E6HJJBG3ZQJC1DRUS70A2NTXIDBPffi5bv"
 RUNPOD_ENDPOINT_ID = "mj3o3oohv9up54"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -33,10 +34,9 @@ if uploaded_file is not None:
                 st.error(f"Gagal upload ke database: {e}")
                 st.stop()
         
-        # --- PERBAIKAN: SISTEM POLLING (NGECEK BERKALA) ---
+        # --- SISTEM POLLING (NGECEK BERKALA) ---
         with st.spinner("Video sukses diupload! AI lagi proses (Bisa makan waktu 1-3 menit)..."):
             try:
-                # 1. Tembak RunPod pakai /run (Bukan runsync)
                 runpod_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run"
                 headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
                 payload = {"input": {"video_url": public_url}}
@@ -47,7 +47,6 @@ if uploaded_file is not None:
                     job_data = response.json()
                     job_id = job_data.get("id")
                     
-                    # 2. Cek status terus-menerus sampai COMPLETED
                     status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
                     
                     while True:
@@ -67,14 +66,13 @@ if uploaded_file is not None:
                                     st.write("Preview Whisper:", output_data.get("transcription", ""))
                                 else:
                                     st.error(f"Error dari mesin AI:\n{output_data}")
-                                break # Keluar dari loop
+                                break 
                             
                             elif status in ["FAILED", "CANCELLED"]:
                                 st.error(f"RunPod Gagal: {status_data}")
-                                break # Keluar dari loop
+                                break 
                             
                             else:
-                                # Kalau IN_QUEUE / IN_PROGRESS, tunggu 3 detik lalu cek lagi
                                 time.sleep(3) 
                         else:
                             st.error("Gagal ngecek status ke RunPod.")
