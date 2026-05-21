@@ -10,7 +10,6 @@ def handler(job):
         import whisper
         from supabase import create_client
         
-        # URL & Key Supabase
         supabase_url = "https://dfqegfdehvpttslbzzjv.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmcWVnZmRlaHZwdHRzbGJ6emp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTQwOTgsImV4cCI6MjA5MzI3MDA5OH0.QhklGaVToBBwesBcXh-Y34RRGQSL9EKU7CfYbDJzvC0"
 
@@ -38,11 +37,12 @@ def handler(job):
         result = model.transcribe(video_path)
         segments = result.get("segments", [])
         
-        # 3. LOGIKA PENCARI MOMENTUM / HOOK VIRAL
+        # --- LOGIKA BARU: BLINDFOLD INTRO ---
+        # Kata-kata provokatif tapi profesional untuk nangkep audiens lokal
         hook_keywords = [
-            "rahasia", "ternyata", "jangan", "alasan", "kenapa", 
-            "cara", "fakta", "bayangin", "tapi", "bahkan", "gila", 
-            "perhatikan", "dengerin", "nah", "stop"
+            "rahasia", "bongkar", "fatal", "strategi", "terbukti", 
+            "jangan sampai", "alasan", "kenapa", "fakta", "bayangin", 
+            "perhatikan", "dengerin", "stop"
         ]
         
         start_index = 0
@@ -51,21 +51,24 @@ def handler(job):
         clip_text = ""
 
         if segments:
-            # Cari kalimat pertama yang mengandung kata pemicu viral
+            # 1. Paksa lewati 15 detik pertama (Biar thumbnail/intro ke-skip)
             for i, seg in enumerate(segments):
-                text_lower = seg["text"].lower()
-                if any(kw in text_lower for kw in hook_keywords):
-                    start_index = i
-                    break
+                if seg["start"] >= 15.0:
+                    text_lower = seg["text"].lower()
+                    # 2. Baru cari hook viral setelah intro lewat
+                    if any(kw in text_lower for kw in hook_keywords):
+                        start_index = i
+                        break
             
-            # Jika tidak ada kata trigger, skip 15 detik pertama (buang intro)
-            if start_index == 0 and len(segments) > 4:
+            # 3. Kalau udah dilewati 15 detik tapi ga ada kata hook satupun, 
+            # potong paksa persis dari detik ke-15 aja.
+            if start_index == 0:
                 for i, seg in enumerate(segments):
                     if seg["start"] >= 15.0:
                         start_index = i
                         break
 
-            # Mulai merangkai klip 30-60 detik dari titik momentum tersebut
+            # Mulai merangkai klip
             current_start = segments[start_index]["start"]
             for seg in segments[start_index:]:
                 clip_text += seg["text"] + " "
@@ -76,7 +79,6 @@ def handler(job):
                     start_time = current_start
                     break
             
-            # Jika sisa video dari titik hook kurang dari 30 detik, ambil sampai habis
             if end_time == 0.0:
                 start_time = segments[start_index]["start"]
                 end_time = segments[-1]["end"]
