@@ -21,7 +21,7 @@ def handler(job):
         supabase = create_client(supabase_url, supabase_key)
         model = whisper.load_model("base")
 
-        # 4. Ambil Link Video
+        # 4. Ambil Link Video dari Supabase
         job_input = job.get('input', {})
         video_url = job_input.get('video_url')
         
