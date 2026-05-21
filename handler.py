@@ -11,6 +11,7 @@ def handler(job):
         import whisper
         from supabase import create_client
         
+        # Key Supabase tertanam
         supabase_url = "https://dfqegfdehvpttslbzzjv.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmcWVnZmRlaHZwdHRzbGJ6emp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTQwOTgsImV4cCI6MjA5MzI3MDA5OH0.QhklGaVToBBwesBcXh-Y34RRGQSL9EKU7CfYbDJzvC0"
 
@@ -38,23 +39,31 @@ def handler(job):
         result = model.transcribe(video_path)
         target_dur = random.randint(30, 60)
         
-        # 3. FFMPEG Proses (Portrait, Blur, Auto Caption)
-        # Teks caption diambil dari transkrip awal
-        text_caption = result.get('text', '')[:60] + "..."
-        text_filter = f"drawtext=text='{text_caption}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.5:boxborderw=10"
+        # 3. Pembersihan Teks untuk FFmpeg
+        raw_text = result.get('text', '')[:60].strip()
+        # Buang tanda kutip dan titik dua yang bisa bikin FFmpeg crash
+        safe_text = raw_text.replace("'", "").replace('"', '').replace(':', '').replace('\n', ' ') + "..."
+        
+        # 4. FFMPEG Proses (Portrait, Blur Background, Auto Caption)
+        # Pisahkan layer dengan jelas biar tidak bentrok
+        filter_complex = (
+            "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:10[bg];"
+            "[0:v]scale=1080:-2[fg];"
+            f"[bg][fg]overlay=0:(H-h)/2[merged];"
+            f"[merged]drawtext=text='{safe_text}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-300:box=1:boxcolor=black@0.5:boxborderw=10"
+        )
         
         ffmpeg_cmd = [
             "ffmpeg", "-y", 
             "-ss", "00:00:15", "-t", str(target_dur), 
             "-i", video_path,
-            "-filter_complex", 
-            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:10[bg];[0:v]scale=1080:-2[fg];[bg][fg]overlay=0:(H-h)/2,{text_filter}",
+            "-filter_complex", filter_complex,
             "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", 
             output_path
         ]
         subprocess.run(ffmpeg_cmd, check=True)
 
-        # 4. Upload ke Supabase
+        # 5. Upload ke Supabase
         with open(output_path, "rb") as f:
             supabase.storage.from_("videos").upload(path=output_filename, file=f)
         
