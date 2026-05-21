@@ -7,14 +7,13 @@ import subprocess
 import random
 
 def format_time(t):
-    # Mengubah detik jadi format waktu SRT
     h = int(t // 3600)
     m = int((t % 3600) // 60)
     s = int(t % 60)
     ms = int(round((t % 1) * 1000))
-    if ms == 1000:
+    if ms >= 1000:
         s += 1
-        ms = 0
+        ms -= 1000
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 def handler(job):
@@ -27,7 +26,7 @@ def handler(job):
 
         supabase = create_client(supabase_url, supabase_key)
         
-        # 1. UPGRADE MODEL KE 'small' BIAR BAHASA INDONESIA TAJAM & GAK HALUSINASI
+        # Pakai model small untuk akurasi tinggi
         model = whisper.load_model("small")
 
         job_input = job.get('input', {})
@@ -42,62 +41,49 @@ def handler(job):
         output_filename = f"final_{unique_id}.mp4"
         output_path = f"/tmp/{output_filename}"
 
-        # 2. Download Video
+        # 1. Download Video
         r = requests.get(video_url, stream=True)
         with open(video_path, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        # 3. Transcribe (Tanpa word_timestamps bawaan yang cacat)
-        result = model.transcribe(video_path)
+        # 2. Transcribe Paksa ke Bahasa Indonesia + Word Timestamps Aktif
+        result = model.transcribe(video_path, word_timestamps=True, language="id")
         
         target_dur = random.randint(30, 60)
         start_time = 15.0
         end_time = start_time + target_dur
         
-        # 4. ALGORITMA PAKSA PECAH PER KATA (MRBEAST STYLE GUARANTEED)
+        # 3. Merakit SRT Per Kata Asli dari AI
         srt_content = ""
         sub_index = 1
         
         for seg in result.get("segments", []):
-            seg_start = seg["start"]
-            seg_end = seg["end"]
-            text = seg["text"].strip()
-            
-            # Cuma ambil suara di durasi klip kita
-            if seg_end > start_time and seg_start < end_time:
-                words = text.split()
-                if not words:
-                    continue
-                    
-                # Bagi durasi suara secara merata ke setiap kata
-                seg_duration = seg_end - seg_start
-                time_per_word = seg_duration / len(words)
+            for word_info in seg.get("words", []):
+                w_start = word_info["start"]
+                w_end = word_info["end"]
                 
-                for i, word in enumerate(words):
-                    w_start = seg_start + (i * time_per_word)
-                    w_end = w_start + time_per_word
-                    
-                    # Relatifkan ke waktu potong video FFmpeg (-ss)
+                # Cuma ambil kata yang masuk di dalam durasi potong kita
+                if w_end > start_time and w_start < end_time:
                     rel_start = max(0, w_start - start_time)
                     rel_end = min(target_dur, w_end - start_time)
                     
                     if rel_end > rel_start:
-                        # Bersihkan simbol aneh supaya ga crash
-                        clean_word = "".join(e for e in word if e.isalnum() or e.isspace()).upper()
+                        word_text = word_info['word'].strip().upper()
+                        # Bersihkan karakter aneh yang bikin render patah
+                        clean_word = "".join(c for c in word_text if c.isalnum() or c in ".,?! ")
                         
                         srt_content += f"{sub_index}\n"
                         srt_content += f"{format_time(rel_start)} --> {format_time(rel_end)}\n"
                         srt_content += f"{clean_word}\n\n"
                         sub_index += 1
 
-        # Tulis ke GPU
         with open(srt_path, "w", encoding="utf-8") as f:
             f.write(srt_content)
 
-        # 5. FFMPEG dengan Subtitles Filter
-        # Font lebih besar (FontSize=100), Outline tebal
-        style = "FontName=Arial,FontSize=100,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=5,Shadow=0,Alignment=2,MarginV=600"
+        # 4. FFMPEG dengan Subtitles Filter
+        # FONTNAME DIHAPUS supaya pakai default aman dari Linux. Size raksasa (90).
+        style = "FontSize=90,PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,BorderStyle=1,Outline=4,Shadow=0,Alignment=2,MarginV=400"
         
         filter_complex = (
             "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:10[bg];"
@@ -116,7 +102,7 @@ def handler(job):
         ]
         subprocess.run(ffmpeg_cmd, check=True)
 
-        # 6. Upload Hasil ke Supabase
+        # 5. Upload & Cleanup
         with open(output_path, "rb") as f:
             supabase.storage.from_("videos").upload(path=output_filename, file=f)
         
