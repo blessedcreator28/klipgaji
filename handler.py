@@ -4,6 +4,7 @@ import requests
 import uuid
 import traceback
 import subprocess
+import random
 
 def handler(job):
     try:
@@ -24,7 +25,7 @@ def handler(job):
 
         unique_id = str(uuid.uuid4())[:8]
         video_path = f"/tmp/input_{unique_id}.mp4"
-        output_filename = f"blur_{unique_id}.mp4"
+        output_filename = f"final_{unique_id}.mp4"
         output_path = f"/tmp/{output_filename}"
 
         # 1. Download Video
@@ -33,72 +34,38 @@ def handler(job):
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        # 2. Transcribe
+        # 2. Transcribe & Durasi Random
         result = model.transcribe(video_path)
-        segments = result.get("segments", [])
+        target_dur = random.randint(30, 60)
         
-        # Penentuan waktu potong (Gunakan logika blindfold 15 detik sebelumnya)
-        start_time = 0.0
-        end_time = 0.0
-        if segments:
-            for i, seg in enumerate(segments):
-                if seg["start"] >= 15.0:
-                    start_index = i
-                    break
-            if 'start_index' not in locals():
-                start_index = 0
-                
-            current_start = segments[start_index]["start"]
-            for seg in segments[start_index:]:
-                duration = seg["end"] - current_start
-                if duration >= 30:
-                    end_time = seg["end"]
-                    start_time = current_start
-                    break
-            if end_time == 0.0:
-                start_time = segments[start_index]["start"]
-                end_time = segments[-1]["end"]
-        else:
-            end_time = 30.0
-
-        duration_to_cut = end_time - start_time
-
-        # 3. PROSES FFMPEG: POTONG + UBAH PORTRAIT + BLUR ATAS BAWAH
-        # -ss dan -t ditaruh di depan -i agar proses pemotongan super cepat sebelum masuk ke filter visual
+        # 3. FFMPEG Proses (Portrait, Blur, Auto Caption)
+        # Teks caption diambil dari transkrip awal
+        text_caption = result.get('text', '')[:60] + "..."
+        text_filter = f"drawtext=text='{text_caption}':fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-200:box=1:boxcolor=black@0.5:boxborderw=10"
+        
         ffmpeg_cmd = [
             "ffmpeg", "-y", 
-            "-ss", str(start_time), "-t", str(duration_to_cut), 
+            "-ss", "00:00:15", "-t", str(target_dur), 
             "-i", video_path,
-            "-filter_complex", "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:10[bg];[0:v]scale=1080:-2[fg];[bg][fg]overlay=0:(H-h)/2",
+            "-filter_complex", 
+            f"[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:10[bg];[0:v]scale=1080:-2[fg];[bg][fg]overlay=0:(H-h)/2,{text_filter}",
             "-c:v", "libx264", "-c:a", "aac", "-pix_fmt", "yuv420p", 
             output_path
         ]
         subprocess.run(ffmpeg_cmd, check=True)
 
-        # 4. Upload Hasil ke Supabase
+        # 4. Upload ke Supabase
         with open(output_path, "rb") as f:
-            supabase.storage.from_("videos").upload(
-                path=output_filename,
-                file=f,
-                file_options={"content-type": "video/mp4"}
-            )
+            supabase.storage.from_("videos").upload(path=output_filename, file=f)
         
         clip_url = supabase.storage.from_("videos").get_public_url(output_filename)
 
         os.remove(video_path)
         os.remove(output_path)
 
-        return {
-            "status": "success", 
-            "urls": [clip_url],
-            "transcription": result.get("text", "")[:100]
-        }
+        return {"status": "success", "urls": [clip_url]}
 
     except Exception as e:
-        return {
-            "status": "error", 
-            "message": str(e), 
-            "traceback": traceback.format_exc()
-        }
+        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
 
 runpod.serverless.start({"handler": handler})
