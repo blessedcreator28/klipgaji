@@ -1,8 +1,3 @@
-runpod
+streamlit
 requests
 supabase
-openai-whisper
-torch
-torchaudio
-torchvision
-numpy

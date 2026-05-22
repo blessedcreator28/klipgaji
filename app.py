@@ -1,10 +1,12 @@
 import streamlit as st
-import os
 import requests
 import time
 from supabase import create_client
 
-# Kunci & URL langsung ditempel di sini
+# --- CONFIG & KEYS ---
+SITE_TITLE = "🔥 Jagoan Clipper"
+SITE_SUBTITLE = "Transform Long-Form ke Viral Moments"
+
 SUPABASE_URL = "https://dfqegfdehvpttslbzzjv.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmcWVnZmRlaHZwdHRzbGJ6emp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTQwOTgsImV4cCI6MjA5MzI3MDA5OH0.QhklGaVToBBwesBcXh-Y34RRGQSL9EKU7CfYbDJzvC0"
 RUNPOD_API_KEY = "rpa_I4UJDB6G4QB0E6HJJBG3ZQJC1DRUS70A2NTXIDBPffi5bv"
@@ -12,75 +14,94 @@ RUNPOD_ENDPOINT_ID = "mj3o3oohv9up54"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
+# --- CSS PREMIUM ORANGE THEME ---
 st.set_page_config(page_title="Jagoan Clipper", layout="centered")
-st.title("🔥 Jagoan Clipper Web")
+st.markdown("""
+<style>
+    .stApp { background-color: #0E1117; color: #FFFFFF; }
+    .stButton>button { border: 2px solid #FF7F50; color: #FF7F50; background-color: transparent; border-radius: 8px; width: 100%; }
+    .stButton>button:hover { background-color: #FF7F50; color: white; }
+    .stTabs [data-baseweb="tab-list"] { gap: 20px; }
+    .stTabs [data-baseweb="tab"] { color: #FFFFFF; }
+    .stTabs [aria-selected="true"] { color: #FF7F50; border-bottom: 2px solid #FF7F50; }
+</style>
+""", unsafe_allow_html=True)
 
-st.write("Silakan upload video hasil download lo di bawah:")
+st.title(SITE_TITLE)
+st.markdown(f"### {SITE_SUBTITLE}")
 
-uploaded_file = st.file_uploader("Pilih file video (MP4)", type=['mp4', 'mov'])
+# --- TABS SYSTEM ---
+tab1, tab2 = st.tabs(["🔗 Paste Link (Main)", "📁 Upload Manual"])
 
-if uploaded_file is not None:
-    if st.button("Generate Klip"):
-        with st.spinner("Lagi upload video ke database..."):
-            try:
-                file_name = f"{int(time.time())}_{uploaded_file.name}"
-                supabase.storage.from_("videos").upload(
-                    path=file_name,
-                    file=uploaded_file.getvalue(),
-                    file_options={"content-type": "video/mp4"}
-                )
-                public_url = supabase.storage.from_("videos").get_public_url(file_name)
-            except Exception as e:
-                st.error(f"Gagal upload ke database: {e}")
-                st.stop()
+with tab1:
+    st.warning("⚠️ YouTube API saat ini sedang dalam peningkatan keamanan & maintenance.")
+    st.text_input("Paste Link YouTube:", placeholder="https://youtube.com/...")
+    st.button("Proses Link (Maintenance)")
+
+with tab2:
+    st.info("💡 **Panduan Download:** Belum punya file videonya? Ikuti langkah ini:")
+    st.markdown("""
+    1. Buka [**ytdown.to**](https://app.ytdown.to/)
+    2. Paste link YouTube lo di sana dan *download* videonya.
+    3. Setelah berhasil download, **Upload** file videonya di bawah ini:
+    """)
+    
+    uploaded_file = st.file_uploader("Upload video mentah (Max 200MB):", type=['mp4', 'mov'])
+    
+    if uploaded_file and st.button("Bikin Viral Sekarang"):
+        public_url = ""
+        progress_text = st.empty()
         
-        # --- SISTEM POLLING (NGECEK BERKALA) ---
-        with st.spinner("Video sukses diupload! AI lagi proses (Bisa makan waktu 1-3 menit)..."):
-            try:
-                runpod_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run"
-                headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
-                payload = {"input": {"video_url": public_url}}
+        # 1. Bypass Upload (Catbox)
+        progress_text.text("Step 1/3: Uploading to Bypass Server...")
+        try:
+            files = {"fileToUpload": (uploaded_file.name, uploaded_file.getvalue(), "video/mp4")}
+            upload_resp = requests.post("https://catbox.moe/user/api.php", data={"reqtype": "fileupload"}, files=files)
+            if upload_resp.status_code == 200:
+                public_url = upload_resp.text.strip()
+            else:
+                st.error(f"Gagal upload ke server bypass: {upload_resp.text}")
+                st.stop()
+        except Exception as e:
+            st.error(f"Error Bypass Server: {e}")
+            st.stop()
+
+        if public_url:
+            progress_text.text("Step 2/3: AI Analyzing & Rendering Momentum...")
+            # 2. Polling RunPod
+            runpod_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run"
+            headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
+            response = requests.post(runpod_url, json={"input": {"video_url": public_url}}, headers=headers)
+            
+            if response.status_code == 200:
+                job_id = response.json().get("id")
+                status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
                 
-                response = requests.post(runpod_url, json=payload, headers=headers)
-                
-                if response.status_code == 200:
-                    job_data = response.json()
-                    job_id = job_data.get("id")
+                while True:
+                    status_resp = requests.get(status_url, headers=headers).json()
+                    status = status_resp.get("status")
                     
-                    status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
-                    
-                    while True:
-                        status_resp = requests.get(status_url, headers=headers)
-                        if status_resp.status_code == 200:
-                            status_data = status_resp.json()
-                            status = status_data.get("status")
-                            
-                            if status == "COMPLETED":
-                                output_data = status_data.get("output", {})
-                                if output_data.get("status") == "success":
-                                    st.success("✅ Klip berhasil dibuat!")
-                                    clips = output_data.get("urls", [])
-                                    for i, clip_url in enumerate(clips):
-                                        st.write(f"🎬 **Klip {i+1}**")
-                                        st.video(clip_url)
-                                    st.write("Preview Whisper:", output_data.get("transcription", ""))
-                                else:
-                                    st.error(f"Error dari mesin AI:\n{output_data}")
-                                break 
-                            
-                            elif status in ["FAILED", "CANCELLED"]:
-                                st.error(f"RunPod Gagal: {status_data}")
-                                break 
-                            
+                    if status == "COMPLETED":
+                        progress_text.text("Step 3/3: Panen Klip Selesai!")
+                        output_data = status_resp.get("output", {})
+                        clips = output_data.get("urls", [])
+                        total_clips = output_data.get("total_clips", len(clips))
+                        
+                        st.success(f"Berhasil panen {total_clips} klip!")
+                        
+                        # 3. Grid 3 Preview + Download
+                        cols = st.columns(3)
+                        for i, clip_url in enumerate(clips):
+                            if i < 3:
+                                with cols[i % 3]:
+                                    st.video(clip_url)
+                                    st.markdown(f"📥 [**Download {i+1}**]({clip_url})")
                             else:
-                                time.sleep(3) 
-                        else:
-                            st.error("Gagal ngecek status ke RunPod.")
-                            break
-                else:
-                    st.error(f"Koneksi awal RunPod Gagal: {response.text}")
-                    
-            except Exception as e:
-                st.error(f"System Error: {e}")
-else:
-    st.info("Sistem paste link dinonaktifkan. Gunakan tombol 'Browse files' di atas untuk memproses video.")
+                                st.markdown(f"📥 [**Download Klip {i+1}**]({clip_url})")
+                        break
+                    elif status in ["FAILED", "CANCELLED"]:
+                        st.error("Proses gagal di tengah jalan.")
+                        break
+                    time.sleep(5)
+            else:
+                st.error("Koneksi ke RunPod gagal.")
