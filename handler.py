@@ -11,7 +11,6 @@ def handler(job):
         import whisper
         from supabase import create_client
         
-        # Kunci Supabase Lo Wajib Aman di Sini
         supabase_url = "https://dfqegfdehvpttslbzzjv.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmcWVnZmRlaHZwdHRzbGJ6emp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTQwOTgsImV4cCI6MjA5MzI3MDA5OH0.QhklGaVToBBwesBcXh-Y34RRGQSL9EKU7CfYbDJzvC0"
 
@@ -30,40 +29,43 @@ def handler(job):
         # --- PREPARE FONT ---
         font_url = "https://raw.githubusercontent.com/LonamiWebs/8-Bally-Pool/master/src/Resources/Original/font/theboldfont.ttf"
         font_path = "/tmp/theboldfont.ttf"
+        
+        # Fake User-Agent biar gak ditendang server saat download
+        fake_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36"
+        }
+
         if not os.path.exists(font_path):
-            r_font = requests.get(font_url, stream=True)
+            r_font = requests.get(font_url, stream=True, headers=fake_headers)
             with open(font_path, 'wb') as f:
                 for chunk in r_font.iter_content(chunk_size=8192):
                     f.write(chunk)
 
-        # 1. Download Video Mentah
-        r = requests.get(video_url, stream=True)
+        # 1. Download Video Mentah (Pakai Topeng Anti-Blokir Catbox)
+        r = requests.get(video_url, stream=True, headers=fake_headers)
         with open(video_path, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192):
                 f.write(chunk)
 
-        # 2. Transcribe Total (Fokus Lokal ID)
+        # 2. Transcribe Total
         result = model.transcribe(video_path, language="id", word_timestamps=True, fp16=False)
         segments = result.get("segments", [])
         
         if not segments:
              return {"status": "error", "message": "Tidak ada suara yang terdeteksi di video."}
              
-        # Cari tahu durasi total video dari ucapan terakhir
         total_duration = segments[-1]["end"]
         
         # --- INISIALISASI MESIN PABRIK MULTI-CLIP ---
-        start_time = 15.0 # Blindfold intro
+        start_time = 15.0 
         clip_urls = []
         clip_count = 1
-        max_clips = 25 # Rem blong GPU (Safety Cap)
+        max_clips = 25 
         
-        # 3. Looping Pemotongan Tanpa Henti
         while start_time < total_duration and clip_count <= max_clips:
             target_dur = random.randint(30, 60)
             end_time = start_time + target_dur
             
-            # Berhenti kalau sisa video kurang dari 30 detik (biar klip terakhir ga kepotong aneh)
             if (total_duration - start_time) < 30.0:
                 break
                 
@@ -74,12 +76,10 @@ def handler(job):
             output_filename = f"clip_{clip_count}_{unique_id}.mp4"
             output_path = f"/tmp/{output_filename}"
             
-            # A. Rakit Drawtext Khusus Klip Ini
             drawtexts = []
             for seg in segments:
                 words = seg.get("words", [])
                 
-                # Algoritma penyelamat kalau AI ga dapet word_timestamps
                 if not words:
                     text = seg.get("text", "").strip()
                     word_list = text.split()
@@ -107,7 +107,6 @@ def handler(job):
                                 dt = f"drawtext=fontfile='{font_path}':text='{clean_word}':fontcolor=yellow:fontsize=120:borderw=8:bordercolor=black:x=(w-text_w)/2:y=(h-text_h)/2+350:enable='between(t,{rel_start},{rel_end})'"
                                 drawtexts.append(dt)
 
-            # B. Bangun Arsitektur Filter FFmpeg
             base_filter = "[0:v]scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=30:10[bg];[0:v]scale=1080:-2[fg];[bg][fg]overlay=0:(H-h)/2"
             
             if drawtexts:
@@ -116,7 +115,6 @@ def handler(job):
             else:
                 filter_complex = base_filter
 
-            # C. Eksekusi FFmpeg untuk Klip Ini
             ffmpeg_cmd = [
                 "ffmpeg", "-y", 
                 "-ss", str(start_time), "-t", str(target_dur), 
@@ -127,21 +125,17 @@ def handler(job):
             ]
             subprocess.run(ffmpeg_cmd, check=True)
 
-            # D. Upload Klip Ini ke Supabase
             with open(output_path, "rb") as f:
                 supabase.storage.from_("videos").upload(path=output_filename, file=f)
             
             clip_url = supabase.storage.from_("videos").get_public_url(output_filename)
             clip_urls.append(clip_url)
             
-            # Bersihkan file klip ini biar RunPod ga kepenuhan
             os.remove(output_path)
             
-            # E. Geser Momentum untuk Klip Selanjutnya
             start_time = end_time
             clip_count += 1
 
-        # Bersihkan video mentah di akhir semua proses
         if os.path.exists(video_path):
             os.remove(video_path)
 
