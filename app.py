@@ -27,6 +27,47 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- SISTEM LOGIN (GEMBOK DEPAN) ---
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    st.markdown(f"<h1 style='text-align: center; color: #FF7F50;'>🔒 {SITE_TITLE}</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center;'>Sistem ini eksklusif. Masukkan email dan password lo buat akses mesin ini.</p>", unsafe_allow_html=True)
+    
+    with st.form("login_form"):
+        email = st.text_input("Email", placeholder="email@domain.com")
+        password = st.text_input("Password", type="password", placeholder="Password sementara lo")
+        submit = st.form_submit_button("Akses Member Area")
+        
+        if submit:
+            if not email or not password:
+                st.warning("Isi email dan password dulu, Bro.")
+            else:
+                try:
+                    # Validasi kredensial ke Supabase
+                    res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                    if res.session:
+                        st.session_state.authenticated = True
+                        st.rerun()
+                except Exception as e:
+                    st.error("Akses Ditolak! Email atau password lo salah.")
+    
+    # st.stop() ini krusial. Biar orang yg belum login ga bisa liat kode di bawahnya.
+    st.stop() 
+
+
+# ==========================================
+# --- MAIN APP (HANYA BISA DIAKSES KALAU SUDAH LOGIN) ---
+# ==========================================
+
+# Sidebar buat Logout
+with st.sidebar:
+    st.markdown("### ⚙️ Control Panel")
+    if st.button("🚪 Logout"):
+        st.session_state.authenticated = False
+        st.rerun()
+
 st.title(SITE_TITLE)
 st.markdown(f"### {SITE_SUBTITLE}")
 
