@@ -64,12 +64,12 @@ st.title(SITE_TITLE)
 st.markdown(f"### {SITE_SUBTITLE}")
 
 # --- TABS SYSTEM ---
-tab1, tab2, tab3 = st.tabs(["🔗 Paste Link (Main)", "📁 Upload Manual", "🔍 Cek Status (Recovery)"])
+tab1, tab2 = st.tabs(["🔗 Paste Link (Main)", "📁 Upload Manual"])
 
 with tab1:
-    st.warning("⚠️ YouTube API saat ini sedang dalam peningkatan keamanan & maintenance.")
-    st.text_input("Paste Link YouTube:", placeholder="https://youtube.com/...")
-    st.button("Proses Link (Maintenance)")
+    st.warning("⚠️ Fitur Paste Link sedang maintenance sebelum rilis resmi. Gunakan fitur 'Upload Manual' untuk sementara.")
+    st.text_input("Paste Link YouTube:", placeholder="https://youtube.com/...", disabled=True)
+    st.button("Proses Link (Maintenance)", disabled=True)
 
 with tab2:
     st.info("💡 **Panduan Download:** Belum punya file videonya? Ikuti langkah ini:")
@@ -79,7 +79,7 @@ with tab2:
     3. Setelah berhasil download, **Upload** file videonya di bawah ini:
     """)
     
-    uploaded_file = st.file_uploader("Upload video mentah (Max 200MB):", type=['mp4', 'mov'])
+    uploaded_file = st.file_uploader("Upload video mentah (Max 200MB, disarankan durasi < 20 menit):", type=['mp4', 'mov'])
     
     if uploaded_file and st.button("Bikin Viral Sekarang"):
         public_url = ""
@@ -113,12 +113,7 @@ with tab2:
             
             if response.status_code == 200:
                 job_id = response.json().get("id")
-                
-                # --- SISTEM RECOVERY BARU ---
-                st.success("✅ Video berhasil masuk ke mesin AI!")
-                st.warning(f"**PENTING - KODE RESI LO:** `{job_id}`\n\n*(Copy kode di atas! Kalau web ini tiba-tiba mati atau layar hilang karena proses terlalu lama, masukkan kode tersebut di tab '🔍 Cek Status (Recovery)' untuk mengambil video lo tanpa perlu upload ulang.)*")
-                
-                progress_text.text("Step 3/3: Mesin AI sedang bekerja... (Bisa ditinggal/di-minimize sekarang)")
+                progress_text.text("Step 3/3: Mesin AI sedang bekerja memotong video... (Jangan tutup tab ini)")
                 
                 status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
                 while True:
@@ -148,46 +143,7 @@ with tab2:
                             break
                         time.sleep(5)
                     except Exception as e:
-                        # Kalau Streamlit putus koneksi, loop berhenti tapi Job ID aman
+                        st.error("Koneksi terputus dari server. Silakan muat ulang halaman dan coba lagi.")
                         break 
             else:
                 st.error("Koneksi awal ke RunPod gagal.")
-
-with tab3:
-    st.markdown("### 🔍 Ambil Hasil Panen (Jalur Belakang)")
-    st.info("Web mati pas lagi nunggu lama? Santai. Masukkan Kode Resi (Job ID) lo di bawah ini buat ngecek apakah AI udah selesai kerja, dan langsung sedot hasilnya.")
-    
-    input_job_id = st.text_input("Masukkan Kode Resi (Job ID):", placeholder="Misal: xyz-12345-abcde")
-    
-    if st.button("Cari & Ambil Klip"):
-        if input_job_id:
-            status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{input_job_id.strip()}"
-            headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
-            
-            with st.spinner("Mengecek server RunPod..."):
-                try:
-                    status_resp = requests.get(status_url, headers=headers).json()
-                    status = status_resp.get("status")
-                    
-                    if status == "COMPLETED":
-                        st.success("✅ AI udah kelar ngerjain tugasnya! Ini hasil panen lo:")
-                        output_data = status_resp.get("output", {})
-                        clips = output_data.get("urls", [])
-                        total_clips = output_data.get("total_clips", len(clips))
-                        
-                        cols = st.columns(3)
-                        for i, clip_url in enumerate(clips):
-                            if i < 3:
-                                with cols[i % 3]:
-                                    st.video(clip_url)
-                                    st.markdown(f"📥 [**Download {i+1}**]({clip_url})")
-                            else:
-                                st.markdown(f"📥 [**Download Klip {i+1}**]({clip_url})")
-                    elif status == "IN_PROGRESS" or status == "IN_QUEUE":
-                        st.warning(f"⏳ Status: **{status}**. Mesin AI masih bekerja. Cek lagi sekitar 5-10 menit ya, Bro.")
-                    else:
-                        st.error(f"❌ Status: **{status}**. Ada error di sisi server AI (RunPod) atau Job ID salah.")
-                except Exception as e:
-                    st.error("Gagal nyambung ke server. Pastikan Job ID lo bener.")
-        else:
-            st.warning("Isi dulu Job ID-nya, Bro.")
