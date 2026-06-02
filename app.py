@@ -20,24 +20,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- LOGIN ---
-if "authenticated" not in st.session_state: st.session_state.authenticated = False
-if not st.session_state.authenticated:
-    st.markdown("<h1 style='text-align: center; color: #FF7F50;'>🔒 Jagoan Clipper</h1>", unsafe_allow_html=True)
-    with st.form("login"):
-        email = st.text_input("Email")
-        password = st.text_input("Password", type="password")
-        if st.form_submit_button("Login"):
-            try:
-                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-                if res.session:
-                    st.session_state.authenticated = email
-                    st.rerun()
-            except: st.error("Login Gagal")
-    st.stop()
+# --- BYPASS LOGIN (SESSION ALWAYS AUTHENTICATED) ---
+# Untuk sementara login dimatikan biar kerjaan lo gak terhambat
+st.session_state.authenticated = True
 
 # --- APP ---
-st.title("🔥 Jagoan Clipper")
+st.title("🔥 Jagoan Clipper (Dev Mode)")
 tab1, tab2 = st.tabs(["📁 Upload & Proses", "🔍 Cek Hasil Panen"])
 
 with tab1:
@@ -55,8 +43,9 @@ with tab1:
                 headers={"Authorization": f"Bearer {RUNPOD_API_KEY}"}
             ).json()
             job_id = runpod_resp.get("id")
-            supabase.table("job_status").insert({"id": job_id, "email": st.session_state.authenticated, "status": "QUEUED"}).execute()
-            st.success(f"✅ Berhasil! Job ID: `{job_id}`. Simpan ID ini untuk cek nanti.")
+            # Simpan ke Supabase tanpa perlu login
+            supabase.table("job_status").insert({"id": job_id, "email": "dev@mode.com", "status": "QUEUED"}).execute()
+            st.success(f"✅ Berhasil! Job ID: `{job_id}`")
 
 with tab2:
     job_id_input = st.text_input("Masukkan Job ID untuk cek hasil")
