@@ -63,7 +63,8 @@ with st.sidebar:
 st.title(SITE_TITLE)
 st.markdown(f"### {SITE_SUBTITLE}")
 
-tab1, tab2 = st.tabs(["🔗 Paste Link (Main)", "📁 Upload Manual"])
+# --- TABS SYSTEM ---
+tab1, tab2, tab3 = st.tabs(["🔗 Paste Link (Main)", "📁 Upload Manual", "🔍 Cek Status (Recovery)"])
 
 with tab1:
     st.warning("⚠️ YouTube API saat ini sedang dalam peningkatan keamanan & maintenance.")
@@ -84,7 +85,7 @@ with tab2:
         public_url = ""
         progress_text = st.empty()
         
-        # 1. Upload ke GoFile (Bypass Server Baru)
+        # 1. Upload ke GoFile
         progress_text.text("Step 1/3: Uploading to Bypass Server (GoFile)...")
         try:
             files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
@@ -105,27 +106,74 @@ with tab2:
             st.stop()
 
         if public_url:
-            progress_text.text("Step 2/3: AI Analyzing & Rendering Momentum...")
-            # 2. Polling RunPod
+            progress_text.text("Step 2/3: Menyiapkan Mesin AI di RunPod...")
             runpod_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run"
             headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
             response = requests.post(runpod_url, json={"input": {"video_url": public_url}}, headers=headers)
             
             if response.status_code == 200:
                 job_id = response.json().get("id")
-                status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
                 
+                # --- SISTEM RECOVERY BARU ---
+                st.success("✅ Video berhasil masuk ke mesin AI!")
+                st.warning(f"**PENTING - KODE RESI LO:** `{job_id}`\n\n*(Copy kode di atas! Kalau web ini tiba-tiba mati atau layar hilang karena proses terlalu lama, masukkan kode tersebut di tab '🔍 Cek Status (Recovery)' untuk mengambil video lo tanpa perlu upload ulang.)*")
+                
+                progress_text.text("Step 3/3: Mesin AI sedang bekerja... (Bisa ditinggal/di-minimize sekarang)")
+                
+                status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
                 while True:
+                    try:
+                        status_resp = requests.get(status_url, headers=headers).json()
+                        status = status_resp.get("status")
+                        
+                        if status == "COMPLETED":
+                            progress_text.text("🔥 Panen Klip Selesai!")
+                            output_data = status_resp.get("output", {})
+                            clips = output_data.get("urls", [])
+                            total_clips = output_data.get("total_clips", len(clips))
+                            
+                            st.success(f"Berhasil panen {total_clips} klip!")
+                            
+                            cols = st.columns(3)
+                            for i, clip_url in enumerate(clips):
+                                if i < 3:
+                                    with cols[i % 3]:
+                                        st.video(clip_url)
+                                        st.markdown(f"📥 [**Download {i+1}**]({clip_url})")
+                                else:
+                                    st.markdown(f"📥 [**Download Klip {i+1}**]({clip_url})")
+                            break
+                        elif status in ["FAILED", "CANCELLED"]:
+                            st.error("Proses AI gagal di tengah jalan (Error dari RunPod).")
+                            break
+                        time.sleep(5)
+                    except Exception as e:
+                        # Kalau Streamlit putus koneksi, loop berhenti tapi Job ID aman
+                        break 
+            else:
+                st.error("Koneksi awal ke RunPod gagal.")
+
+with tab3:
+    st.markdown("### 🔍 Ambil Hasil Panen (Jalur Belakang)")
+    st.info("Web mati pas lagi nunggu lama? Santai. Masukkan Kode Resi (Job ID) lo di bawah ini buat ngecek apakah AI udah selesai kerja, dan langsung sedot hasilnya.")
+    
+    input_job_id = st.text_input("Masukkan Kode Resi (Job ID):", placeholder="Misal: xyz-12345-abcde")
+    
+    if st.button("Cari & Ambil Klip"):
+        if input_job_id:
+            status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{input_job_id.strip()}"
+            headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
+            
+            with st.spinner("Mengecek server RunPod..."):
+                try:
                     status_resp = requests.get(status_url, headers=headers).json()
                     status = status_resp.get("status")
                     
                     if status == "COMPLETED":
-                        progress_text.text("Step 3/3: Panen Klip Selesai!")
+                        st.success("✅ AI udah kelar ngerjain tugasnya! Ini hasil panen lo:")
                         output_data = status_resp.get("output", {})
                         clips = output_data.get("urls", [])
                         total_clips = output_data.get("total_clips", len(clips))
-                        
-                        st.success(f"Berhasil panen {total_clips} klip!")
                         
                         cols = st.columns(3)
                         for i, clip_url in enumerate(clips):
@@ -135,10 +183,11 @@ with tab2:
                                     st.markdown(f"📥 [**Download {i+1}**]({clip_url})")
                             else:
                                 st.markdown(f"📥 [**Download Klip {i+1}**]({clip_url})")
-                        break
-                    elif status in ["FAILED", "CANCELLED"]:
-                        st.error("Proses gagal di tengah jalan.")
-                        break
-                    time.sleep(5)
-            else:
-                st.error("Koneksi ke RunPod gagal.")
+                    elif status == "IN_PROGRESS" or status == "IN_QUEUE":
+                        st.warning(f"⏳ Status: **{status}**. Mesin AI masih bekerja. Cek lagi sekitar 5-10 menit ya, Bro.")
+                    else:
+                        st.error(f"❌ Status: **{status}**. Ada error di sisi server AI (RunPod) atau Job ID salah.")
+                except Exception as e:
+                    st.error("Gagal nyambung ke server. Pastikan Job ID lo bener.")
+        else:
+            st.warning("Isi dulu Job ID-nya, Bro.")
