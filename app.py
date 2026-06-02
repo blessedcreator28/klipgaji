@@ -11,65 +11,67 @@ RUNPOD_ENDPOINT_ID = "mj3o3oohv9up54"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- LOGIN LOGIC ---
+st.set_page_config(page_title="Jagoan Clipper", layout="centered")
+st.markdown("""
+<style>
+    .stApp { background-color: #0E1117; color: #FFFFFF; }
+    .stButton>button { border: 2px solid #FF7F50; color: #FF7F50; background-color: transparent; border-radius: 8px; width: 100%; }
+    .stButton>button:hover { background-color: #FF7F50; color: white; }
+</style>
+""", unsafe_allow_html=True)
+
+# --- LOGIN ---
 if "authenticated" not in st.session_state: st.session_state.authenticated = False
 if not st.session_state.authenticated:
-    # (Kode Login Tetap Sama Seperti Sebelumnya)
-    st.markdown("🔒 **Silakan Login**")
-    email = st.text_input("Email")
-    password = st.text_input("Password", type="password")
-    if st.button("Login"):
-        res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-        if res.session:
-            st.session_state.authenticated = True
-            st.rerun()
+    st.markdown("<h1 style='text-align: center; color: #FF7F50;'>🔒 Jagoan Clipper</h1>", unsafe_allow_html=True)
+    with st.form("login"):
+        email = st.text_input("Email")
+        password = st.text_input("Password", type="password")
+        if st.form_submit_button("Login"):
+            try:
+                res = supabase.auth.sign_in_with_password({"email": email, "password": password})
+                if res.session:
+                    st.session_state.authenticated = email
+                    st.rerun()
+            except: st.error("Login Gagal")
     st.stop()
 
 # --- APP ---
-st.title("🔥 Jagoan Clipper (Professional Backend)")
-
+st.title("🔥 Jagoan Clipper")
 tab1, tab2 = st.tabs(["📁 Upload & Proses", "🔍 Cek Hasil Panen"])
 
 with tab1:
     uploaded_file = st.file_uploader("Upload Video", type=['mp4', 'mov'])
     if uploaded_file and st.button("Proses Video"):
-        # 1. Upload
-        files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
-        upload_resp = requests.post("https://store1.gofile.io/uploadFile", files=files).json()
-        public_url = upload_resp['data']['downloadPage']
+        with st.spinner("Uploading..."):
+            files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
+            resp = requests.post("https://store1.gofile.io/uploadFile", files=files).json()
+            public_url = resp['data']['downloadPage']
         
-        # 2. Trigger RunPod
-        runpod_resp = requests.post(
-            f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run",
-            json={"input": {"video_url": public_url}},
-            headers={"Authorization": f"Bearer {RUNPOD_API_KEY}"}
-        ).json()
-        
-        job_id = runpod_resp.get("id")
-        
-        # 3. SAVE KE SUPABASE (Database as the source of truth)
-        supabase.table("job_status").insert({
-            "id": job_id,
-            "email": st.session_state.authenticated, # Simpan email user
-            "status": "QUEUED"
-        }).execute()
-        
-        st.success(f"✅ Video sedang diproses! Job ID lo: `{job_id}`")
-        st.info("Lo bisa tutup tab ini. Cek status di tab sebelah nanti.")
+        with st.spinner("AI sedang membedah video..."):
+            runpod_resp = requests.post(
+                f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run",
+                json={"input": {"video_url": public_url}},
+                headers={"Authorization": f"Bearer {RUNPOD_API_KEY}"}
+            ).json()
+            job_id = runpod_resp.get("id")
+            supabase.table("job_status").insert({"id": job_id, "email": st.session_state.authenticated, "status": "QUEUED"}).execute()
+            st.success(f"✅ Berhasil! Job ID: `{job_id}`. Simpan ID ini untuk cek nanti.")
 
 with tab2:
     job_id_input = st.text_input("Masukkan Job ID untuk cek hasil")
     if st.button("Cek Status"):
-        # Cek ke Supabase dulu, kalau blm ada baru cek ke RunPod
-        data = supabase.table("job_status").select("*").eq("id", job_id_input).single().execute()
-        
-        # Logika: Kalau di Supabase belum ada update, check RunPod
-        headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
-        status_resp = requests.get(f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id_input}", headers=headers).json()
-        
-        if status_resp.get("status") == "COMPLETED":
-            st.success("Panen Selesai!")
-            st.write(status_resp.get("output"))
-            # Update Supabase ke COMPLETED (bisa lo tambahin fungsi .update() di sini)
-        else:
-            st.warning(f"Status: {status_resp.get('status')}")
+        with st.spinner("Menghubungi server AI..."):
+            headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
+            status_resp = requests.get(f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id_input}", headers=headers).json()
+            status = status_resp.get("status")
+            
+            if status == "COMPLETED":
+                st.success("🔥 Panen Selesai!")
+                output = status_resp.get("output", {})
+                clips = output.get("urls", [])
+                for clip in clips:
+                    st.video(clip)
+                    st.markdown(f"[Download Klip]({clip})")
+            else:
+                st.warning(f"Status saat ini: {status}. Cek lagi dalam beberapa menit ya, Bro.")
