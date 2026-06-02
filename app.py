@@ -79,14 +79,15 @@ with tab2:
     3. Setelah berhasil download, **Upload** file videonya di bawah ini:
     """)
     
-    uploaded_file = st.file_uploader("Upload video mentah (Max 200MB, disarankan durasi < 20 menit):", type=['mp4', 'mov'])
+    uploaded_file = st.file_uploader("Upload video mentah (Max 200MB, Support Long-Form Podcast):", type=['mp4', 'mov'])
     
     if uploaded_file and st.button("Bikin Viral Sekarang"):
         public_url = ""
         progress_text = st.empty()
+        timer_text = st.empty()
         
         # 1. Upload ke GoFile
-        progress_text.text("Step 1/3: Uploading to Bypass Server (GoFile)...")
+        progress_text.info("Step 1/3: Uploading to Bypass Server (GoFile)...")
         try:
             files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
             upload_resp = requests.post("https://store1.gofile.io/uploadFile", files=files)
@@ -106,28 +107,36 @@ with tab2:
             st.stop()
 
         if public_url:
-            progress_text.text("Step 2/3: Menyiapkan Mesin AI di RunPod...")
+            progress_text.info("Step 2/3: Menyiapkan Mesin AI di RunPod...")
             runpod_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run"
             headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
             response = requests.post(runpod_url, json={"input": {"video_url": public_url}}, headers=headers)
             
             if response.status_code == 200:
                 job_id = response.json().get("id")
-                progress_text.text("Step 3/3: Mesin AI sedang bekerja memotong video... (Jangan tutup tab ini)")
+                progress_text.warning("Step 3/3: Mesin AI sedang membedah momentum viral lo. (Jangan tutup tab ini, biarkan AI bekerja)")
                 
                 status_url = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
+                start_time = time.time()
+                
                 while True:
                     try:
+                        # UI Keep-Alive Timer biar tab gak ketiduran
+                        elapsed_time = int(time.time() - start_time)
+                        mins, secs = divmod(elapsed_time, 60)
+                        timer_text.markdown(f"⏳ **Waktu proses AI:** {mins:02d}:{secs:02d} (Mesin masih aktif...)")
+                        
                         status_resp = requests.get(status_url, headers=headers).json()
                         status = status_resp.get("status")
                         
                         if status == "COMPLETED":
-                            progress_text.text("🔥 Panen Klip Selesai!")
+                            timer_text.empty()
+                            progress_text.success("🔥 Panen Klip Selesai!")
                             output_data = status_resp.get("output", {})
                             clips = output_data.get("urls", [])
                             total_clips = output_data.get("total_clips", len(clips))
                             
-                            st.success(f"Berhasil panen {total_clips} klip!")
+                            st.success(f"SADIS! Berhasil panen {total_clips} klip siap viral!")
                             
                             cols = st.columns(3)
                             for i, clip_url in enumerate(clips):
@@ -139,11 +148,13 @@ with tab2:
                                     st.markdown(f"📥 [**Download Klip {i+1}**]({clip_url})")
                             break
                         elif status in ["FAILED", "CANCELLED"]:
-                            st.error("Proses AI gagal di tengah jalan (Error dari RunPod).")
+                            timer_text.empty()
+                            st.error("Proses AI gagal di tengah jalan. AI RunPod kehabisan memori atau error.")
                             break
+                        
                         time.sleep(5)
                     except Exception as e:
-                        st.error("Koneksi terputus dari server. Silakan muat ulang halaman dan coba lagi.")
+                        st.error("Koneksi terputus dari server AI. Silakan muat ulang halaman.")
                         break 
             else:
-                st.error("Koneksi awal ke RunPod gagal.")
+                st.error("Koneksi awal ke RunPod gagal. Saldo atau server mungkin sedang down.")
