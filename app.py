@@ -45,23 +45,15 @@ if not st.session_state.authenticated:
                 st.warning("Isi email dan password dulu, Bro.")
             else:
                 try:
-                    # Validasi kredensial ke Supabase
                     res = supabase.auth.sign_in_with_password({"email": email, "password": password})
                     if res.session:
                         st.session_state.authenticated = True
                         st.rerun()
                 except Exception as e:
                     st.error("Akses Ditolak! Email atau password lo salah.")
-    
-    # st.stop() ini krusial. Biar orang yg belum login ga bisa liat kode di bawahnya.
     st.stop() 
 
-
-# ==========================================
-# --- MAIN APP (HANYA BISA DIAKSES KALAU SUDAH LOGIN) ---
-# ==========================================
-
-# Sidebar buat Logout
+# --- MAIN APP ---
 with st.sidebar:
     st.markdown("### ⚙️ Control Panel")
     if st.button("🚪 Logout"):
@@ -71,7 +63,6 @@ with st.sidebar:
 st.title(SITE_TITLE)
 st.markdown(f"### {SITE_SUBTITLE}")
 
-# --- TABS SYSTEM ---
 tab1, tab2 = st.tabs(["🔗 Paste Link (Main)", "📁 Upload Manual"])
 
 with tab1:
@@ -93,15 +84,21 @@ with tab2:
         public_url = ""
         progress_text = st.empty()
         
-        # 1. Bypass Upload (Catbox)
-        progress_text.text("Step 1/3: Uploading to Bypass Server...")
+        # 1. Upload ke GoFile (Bypass Server Baru)
+        progress_text.text("Step 1/3: Uploading to Bypass Server (GoFile)...")
         try:
-            files = {"fileToUpload": (uploaded_file.name, uploaded_file.getvalue(), "video/mp4")}
-            upload_resp = requests.post("https://catbox.moe/user/api.php", data={"reqtype": "fileupload"}, files=files)
+            files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
+            upload_resp = requests.post("https://store1.gofile.io/uploadFile", files=files)
+            
             if upload_resp.status_code == 200:
-                public_url = upload_resp.text.strip()
+                result = upload_resp.json()
+                if result['status'] == 'ok':
+                    public_url = result['data']['downloadPage']
+                else:
+                    st.error(f"Gagal upload ke server bypass: {result.get('status')}")
+                    st.stop()
             else:
-                st.error(f"Gagal upload ke server bypass: {upload_resp.text}")
+                st.error("Gagal koneksi ke server upload (GoFile).")
                 st.stop()
         except Exception as e:
             st.error(f"Error Bypass Server: {e}")
@@ -130,7 +127,6 @@ with tab2:
                         
                         st.success(f"Berhasil panen {total_clips} klip!")
                         
-                        # 3. Grid 3 Preview + Download
                         cols = st.columns(3)
                         for i, clip_url in enumerate(clips):
                             if i < 3:
