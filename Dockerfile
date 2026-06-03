@@ -1,16 +1,13 @@
-FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
+# Base image yang ringan dan sudah ada CUDA/PyTorch
+FROM runpod/pytorch:2.0.1-py3.10-cuda11.8.0-devel
 
-RUN apt-get update && apt-get install -y \
-    python3-pip \
-    ffmpeg \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# Install dependencies sistem
+RUN apt-get update && apt-get install -y ffmpeg libsm6 libxext6 && \
+    pip install --upgrade pip && \
+    pip install runpod openai-whisper supabase requests
 
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+# Copy handler.py ke dalam container
 COPY handler.py .
 
-CMD ["python3", "-u", "handler.py"]
+# Jalankan handler
+CMD ["python3", "handler.py"]
