@@ -20,8 +20,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- BYPASS LOGIN (SESSION ALWAYS AUTHENTICATED) ---
-# Untuk sementara login dimatikan biar kerjaan lo gak terhambat
+# --- BYPASS LOGIN ---
 st.session_state.authenticated = True
 
 # --- APP ---
@@ -31,10 +30,20 @@ tab1, tab2 = st.tabs(["📁 Upload & Proses", "🔍 Cek Hasil Panen"])
 with tab1:
     uploaded_file = st.file_uploader("Upload Video", type=['mp4', 'mov'])
     if uploaded_file and st.button("Proses Video"):
-        with st.spinner("Uploading..."):
-            files = {"file": (uploaded_file.name, uploaded_file.getvalue())}
-            resp = requests.post("https://store1.gofile.io/uploadFile", files=files).json()
-            public_url = resp['data']['downloadPage']
+        with st.spinner("Mengamankan video ke brankas Supabase..."):
+            # Bikin nama file unik biar gak bentrok
+            file_ext = uploaded_file.name.split('.')[-1]
+            unique_filename = f"input_raw_{int(time.time())}.{file_ext}"
+            
+            # Upload langsung ke Supabase (bucket 'videos')
+            supabase.storage.from_("videos").upload(
+                path=unique_filename,
+                file=uploaded_file.getvalue(),
+                file_options={"content-type": f"video/{file_ext}"}
+            )
+            
+            # Ambil link video MENTAH (Jalur VIP)
+            public_url = supabase.storage.from_("videos").get_public_url(unique_filename)
         
         with st.spinner("AI sedang membedah video..."):
             runpod_resp = requests.post(
@@ -43,7 +52,7 @@ with tab1:
                 headers={"Authorization": f"Bearer {RUNPOD_API_KEY}"}
             ).json()
             job_id = runpod_resp.get("id")
-            # Simpan ke Supabase tanpa perlu login
+            
             supabase.table("job_status").insert({"id": job_id, "email": "dev@mode.com", "status": "QUEUED"}).execute()
             st.success(f"✅ Berhasil! Job ID: `{job_id}`")
 
@@ -56,11 +65,20 @@ with tab2:
             status = status_resp.get("status")
             
             if status == "COMPLETED":
-                st.success("🔥 Panen Selesai!")
                 output = status_resp.get("output", {})
-                clips = output.get("urls", [])
-                for clip in clips:
-                    st.video(clip)
-                    st.markdown(f"[Download Klip]({clip})")
+                
+                # Detektor Error (Biar gak dikibulin tulisan COMPLETED)
+                if output.get("status") == "error":
+                    st.error(f"❌ Mesin Gagal Panen: {output.get('message')}")
+                    with st.expander("Bongkar Mesin (Log Error)"):
+                        st.code(output.get("traceback", output.get("bukti_url", "No extra info")))
+                else:
+                    st.success("🔥 Panen Selesai!")
+                    clips = output.get("urls", [])
+                    if not clips:
+                        st.warning("Proses selesai, tapi AI tidak menghasilkan klip satupun.")
+                    for clip in clips:
+                        st.video(clip)
+                        st.markdown(f"[Download Klip]({clip})")
             else:
                 st.warning(f"Status saat ini: {status}. Cek lagi dalam beberapa menit ya, Bro.")
