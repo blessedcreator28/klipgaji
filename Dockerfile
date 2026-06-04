@@ -1,10 +1,8 @@
 FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 
-# Setup lingkungan
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Jakarta
 
-# Install python, ffmpeg, dan git
 RUN apt-get update && apt-get install -y \
     python3-pip \
     ffmpeg \
@@ -13,14 +11,13 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 
-# INI KUNCINYA: Paksa builder buat buang cache lama
-ARG CACHEBUST=1
-
-# Copy daftar belanja
 COPY requirements.txt .
-
-# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
+
+# --- BARIS SAKTI INI YANG BIKIN CEPET ---
+# Mendownload model whisper 'small' saat build agar tidak download saat runtime
+RUN python3 -c "import whisper; whisper.load_model('small')"
+# ----------------------------------------
 
 COPY . .
 
