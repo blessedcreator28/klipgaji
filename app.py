@@ -11,7 +11,8 @@ RUNPOD_ENDPOINT_ID = "mj3o3oohv9up54"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-st.set_page_config(page_title="KlipGaji - Auto Viral", layout="centered")
+# LAYOUT WIDE BUKAN CENTERED
+st.set_page_config(page_title="KlipGaji - Auto Viral", layout="wide")
 st.markdown("""
 <style>
     .stApp { background-color: #0E1117; color: #FFFFFF; }
@@ -46,12 +47,15 @@ if uploaded_file and st.button("Proses Video"):
             headers={"Authorization": f"Bearer {RUNPOD_API_KEY}"}
         ).json()
         job_id = runpod_resp.get("id")
-        supabase.table("job_status").insert({"id": job_id, "email": "dev@mode.com", "status": "QUEUED"}).execute()
         
+        try:
+            supabase.table("job_status").insert({"id": job_id, "email": "dev@mode.com", "status": "QUEUED"}).execute()
+        except:
+            pass
+            
     st.success(f"✅ Mesin menyala! Job ID: `{job_id}`")
     st.info("Jangan tutup halaman ini. Video akan otomatis muncul di bawah saat proses selesai.")
     
-    # --- AUTO-RADAR: Mesin yang nungguin, bukan user ---
     status_placeholder = st.empty()
     video_container = st.container()
     
@@ -66,9 +70,12 @@ if uploaded_file and st.button("Proses Video"):
             clips = output.get("urls", [])
             
             with video_container:
-                for clip in clips:
-                    st.video(clip)
-                    st.markdown(f"[⬇️ Download Klip]({clip})")
+                # --- SISTEM GRID KE SAMPING (3 KOLOM) ---
+                cols = st.columns(3)
+                for i, clip in enumerate(clips):
+                    with cols[i % 3]:
+                        st.video(clip)
+                        st.markdown(f"[⬇️ Download Klip]({clip})")
             break
         elif status in ["FAILED", "error"]:
             status_placeholder.error("❌ Mesin Gagal Panen. Cek log AI.")
