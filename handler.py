@@ -62,6 +62,7 @@ def handler(job):
         print(f"🔗 URL Video diterima: {video_url}")
         unique_id = str(uuid.uuid4())[:8]
         video_path = f"/tmp/input_{unique_id}.mp4"
+        audio_path = f"/tmp/audio_{unique_id}.wav"
         
         print("⬇️ Mulai menyedot video dari Supabase...")
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -78,8 +79,15 @@ def handler(job):
             print("❌ ERROR: File terlalu kecil (Corrupt/Gagal Upload).")
             return {"status": "error", "message": "File video corrupt atau gagal di-upload penuh."}
 
-        print("🧠 AI mulai membedah audio (Transcribe)... Ini butuh tenaga ekstra.")
-        result = model.transcribe(video_path, language="id", word_timestamps=True)
+        # JURUS STERILISASI: Ekstrak audio kotor jadi WAV murni 16kHz
+        print("🎵 Mensterilkan audio dari video agar tidak ditolak AI...")
+        subprocess.run([
+            "ffmpeg", "-y", "-i", video_path, 
+            "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", audio_path
+        ], check=True)
+
+        print("🧠 AI mulai membedah audio murni (Transcribe)... Ini butuh tenaga ekstra.")
+        result = model.transcribe(audio_path, language="id", word_timestamps=True)
         segments = result.get("segments", [])
         
         clips = []
@@ -145,6 +153,7 @@ def handler(job):
             os.remove(ass_path)
 
         if os.path.exists(video_path): os.remove(video_path)
+        if os.path.exists(audio_path): os.remove(audio_path)
         print("🔥 --- SEMUA KLIP SUKSES DIPANEN --- 🔥")
         return {"status": "success", "urls": clip_urls}
 
