@@ -66,25 +66,29 @@ def handler(job):
         
         print("⬇️ Mulai menyedot video dari Supabase...")
         headers = {'User-Agent': 'Mozilla/5.0'}
-        r = requests.get(video_url, stream=True, headers=headers)
+        r = requests.get(video_url, stream=True, headers=headers, timeout=120)
         r.raise_for_status() 
         
         with open(video_path, 'wb') as f:
-            for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
+            for chunk in r.iter_content(chunk_size=8192): 
+                if chunk: f.write(chunk)
                 
         file_size = os.path.getsize(video_path)
         print(f"✅ Download selesai! Ukuran file: {file_size / (1024*1024):.2f} MB")
         
         if file_size < 100000:
-            print("❌ ERROR: File terlalu kecil (Corrupt/Gagal Upload).")
-            return {"status": "error", "message": "File video corrupt atau gagal di-upload penuh."}
+            return {"status": "error", "message": "File video corrupt atau terpotong oleh limit brankas Supabase."}
 
-        # JURUS STERILISASI: Ekstrak audio kotor jadi WAV murni 16kHz
-        print("🎵 Mensterilkan audio dari video agar tidak ditolak AI...")
-        subprocess.run([
-            "ffmpeg", "-y", "-i", video_path, 
-            "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", audio_path
-        ], check=True)
+        print("🎵 Mensterilkan audio secara brutal (mengabaikan codec error)...")
+        try:
+            # Jurus paksa mengabaikan error codec (ignore_err) dan menangkap log asli (capture_output)
+            subprocess.run([
+                "ffmpeg", "-y", "-err_detect", "ignore_err", "-i", video_path, 
+                "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", audio_path
+            ], check=True, capture_output=True, text=True)
+        except subprocess.CalledProcessError as e:
+            print(f"❌ FFMPEG AUDIO ERROR: {e.stderr}")
+            return {"status": "error", "message": f"Video Patah/Corrupt! Bukti Log Asli: {e.stderr[-200:]}"}
 
         print("🧠 AI mulai membedah audio murni (Transcribe)... Ini butuh tenaga ekstra.")
         result = model.transcribe(audio_path, language="id", word_timestamps=True)
@@ -114,7 +118,6 @@ def handler(job):
         print(f"✂️ Selesai bedah otak! Ditemukan {len(clips)} klip daging potensial.")
 
         if len(clips) == 0:
-            print("⚠️ WARNING: Tidak ada percakapan yang bisa dijadikan klip.")
             return {"status": "error", "message": "AI tidak mendeteksi percakapan yang valid untuk dijadikan klip."}
 
         clip_urls = []
@@ -141,7 +144,11 @@ def handler(job):
                 "-c:v", "libx264", "-c:a", "aac", output_path
             ]
             
-            subprocess.run(ffmpeg_cmd, check=True)
+            try:
+                subprocess.run(ffmpeg_cmd, check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                print(f"❌ FFMPEG RENDER ERROR KLIP {i}: {e.stderr}")
+                return {"status": "error", "message": f"Gagal render klip. Log: {e.stderr[-200:]}"}
 
             print(f"☁️ Upload Klip ke-{i+1} ke brankas Supabase...")
             with open(output_path, "rb") as f:
