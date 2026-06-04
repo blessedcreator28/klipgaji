@@ -1,14 +1,25 @@
-FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
 
-# Paksa instalasi jalan tanpa nanya lokasi
+# Setup lingkungan
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Jakarta
 
-RUN apt-get update && apt-get install -y ffmpeg git && rm -rf /var/lib/apt/lists/*
+# Install python, ffmpeg, dan git
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    ffmpeg \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
+# INI KUNCINYA: Paksa builder buat buang cache lama
+ARG CACHEBUST=1
+
+# Copy daftar belanja
 COPY requirements.txt .
+
+# Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
