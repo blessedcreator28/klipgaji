@@ -1,7 +1,6 @@
-cat <<EOF > Dockerfile
 FROM pytorch/pytorch:2.0.1-cuda11.7-cudnn8-runtime
 
-# Jawaban paksa untuk installer (biar nggak nanya-nanya)
+# Paksa instalasi jalan tanpa nanya lokasi
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Jakarta
 
@@ -15,4 +14,3 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 CMD ["python3", "handler.py"]
-EOF
