@@ -10,7 +10,6 @@ from supabase import create_client
 model = whisper.load_model("small") 
 
 def generate_mrbeast_subs(words, clip_start, ass_path):
-    # Racikan rahasia: Subtitle ASS gaya MrBeast (Word-by-word, Kuning, Outline Hitam Tebal, Posisi Tengah)
     ass_header = """[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -39,7 +38,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             
             t_start = format_time(start_t)
             t_end = format_time(end_t)
-            # Bersihkan tanda baca dan jadikan HURUF KAPITAL semua
             text = w['word'].strip().upper()
             
             f.write(f"Dialogue: 0,{t_start},{t_end},MrBeast,,0,0,0,,{text}\n")
@@ -66,11 +64,9 @@ def handler(job):
         with open(video_path, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
                 
-        # AI MENDENGAR SECARA DETAIL (Word Timestamps)
         result = model.transcribe(video_path, language="id", word_timestamps=True)
         segments = result.get("segments", [])
         
-        # LOGIKA PEMOTONGAN CERDAS BERDASARKAN KONTEKS (Target: 40-60 detik)
         clips = []
         current_clip = {"start": 0, "end": 0, "words": []}
         
@@ -84,20 +80,17 @@ def handler(job):
             current_clip["end"] = seg["end"]
             duration = current_clip["end"] - current_clip["start"]
             
-            # Jika durasi sudah mencukupi (>= 40 detik), potong di akhir kalimat ini
             if duration >= 40.0:
                 clips.append(current_clip)
                 current_clip = {"start": 0, "end": 0, "words": []}
-                # Batasi maksimal 3 klip daging per eksekusi agar render cepat
-                if len(clips) >= 3: break 
+                # BUKA GEMBOK: Maksimal 100 klip
+                if len(clips) >= 100: break 
                 
-        # Ambil sisa percakapan jika durasinya lebih dari 20 detik
-        if current_clip["words"] and (current_clip["end"] - current_clip["start"] >= 20.0) and len(clips) < 3:
+        if current_clip["words"] and (current_clip["end"] - current_clip["start"] >= 20.0) and len(clips) < 100:
             clips.append(current_clip)
 
         clip_urls = []
         
-        # PROSES RENDER (POTONG + BLUR + MRBEAST TEXT)
         for i, c in enumerate(clips):
             clip_start = c["start"]
             clip_end = c["end"]
