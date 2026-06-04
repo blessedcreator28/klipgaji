@@ -1,89 +1,44 @@
 import streamlit as st
+import boto3
+import os
+import uuid
 import requests
-import time
 from supabase import create_client
 
-# --- CONFIG & KEYS ---
-SUPABASE_URL = "https://dfqegfdehvpttslbzzjv.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmcWVnZmRlaHZwdHRzbGJ6emp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTQwOTgsImV4cCI6MjA5MzI3MDA5OH0.QhklGaVToBBwesBcXh-Y34RRGQSL9EKU7CfYbDJzvC0"
-RUNPOD_API_KEY = "rpa_I4UJDB6G4QB0E6HJJBG3ZQJC1DRUS70A2NTXIDBPffi5bv"
-RUNPOD_ENDPOINT_ID = "mj3o3oohv9up54"
+# Inisialisasi R2 (Cloudflare) - Menarik kunci dari 'Secrets' Streamlit
+s3 = boto3.client('s3',
+    endpoint_url=os.environ['R2_ENDPOINT'],
+    aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
+    aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
+    region_name='auto'
+)
 
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-st.set_page_config(page_title="KlipGaji - Auto Viral", layout="wide")
-st.markdown("""
-<style>
-    .stApp { background-color: #0E1117; color: #FFFFFF; }
-    .stButton>button { border: 2px solid #FF7F50; color: #FF7F50; background-color: transparent; border-radius: 8px; width: 100%; }
-    .stButton>button:hover { background-color: #FF7F50; color: white; }
-</style>
-""", unsafe_allow_html=True)
-
-st.session_state.authenticated = True
+# Inisialisasi Supabase
+supabase = create_client(os.environ['SUPABASE_URL'], os.environ['SUPABASE_KEY'])
 
 st.title("🔥 KlipGaji (Dev Mode)")
-st.markdown("Mesin pencetak klip otomatis untuk dominasi market lokal. Upload, tinggal tidur, panen!")
+st.write("Mesin pencetak klip otomatis. Upload, tinggal tidur, panen!")
 
-uploaded_file = st.file_uploader("Upload Video Mentah Lo Di Sini (Batas Aman: Max 200MB / ~15 Menit)", type=['mp4', 'mov'])
+uploaded_file = st.file_uploader("Upload Video Mentah (Max 1GB)", type=['mp4', 'mov'])
 
 if uploaded_file and st.button("Proses Video"):
-    with st.spinner("Mengamankan video ke brankas... (Jangan tutup halaman)"):
-        file_ext = uploaded_file.name.split('.')[-1]
-        unique_filename = f"input_raw_{int(time.time())}.{file_ext}"
-        
-        supabase.storage.from_("videos").upload(
-            path=unique_filename,
-            file=uploaded_file.getvalue(),
-            file_options={"content-type": f"video/{file_ext}"}
-        )
-        public_url = supabase.storage.from_("videos").get_public_url(unique_filename)
-    
-    with st.spinner("Mengirim perintah eksekusi ke AI..."):
-        runpod_resp = requests.post(
-            f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run",
-            json={"input": {"video_url": public_url}},
-            headers={"Authorization": f"Bearer {RUNPOD_API_KEY}"}
-        ).json()
-        job_id = runpod_resp.get("id")
-        
+    with st.spinner('Uploading ke R2...'):
         try:
-            supabase.table("job_status").insert({"id": job_id, "email": "dev@mode.com", "status": "QUEUED"}).execute()
-        except:
-            pass
+            unique_filename = f"{uuid.uuid4()}.mp4"
             
-    st.success(f"✅ Mesin menyala! Job ID: `{job_id}`")
-    st.info("Jangan tutup halaman ini. Video akan otomatis muncul di bawah saat proses selesai.")
-    
-    status_placeholder = st.empty()
-    video_container = st.container()
-    
-    while True:
-        headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}"}
-        status_resp = requests.get(f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}", headers=headers).json()
-        status = status_resp.get("status")
-        
-        if status == "COMPLETED":
-            output = status_resp.get("output", {})
+            # Upload ke R2
+            s3.upload_fileobj(uploaded_file, os.environ['R2_BUCKET'], unique_filename)
+            video_url = f"{os.environ['R2_ENDPOINT']}/{os.environ['R2_BUCKET']}/{unique_filename}"
             
-            # PROTEKSI BARU: Cek kalau AI diam-diam ngeluarin status Error
-            if isinstance(output, dict) and output.get("status") == "error":
-                status_placeholder.error(f"❌ MESIN NABRAK TEMBOK: {output.get('message')}")
-                break
-                
-            status_placeholder.success("🔥 PANEN SELESAI! Klip siap dihajar ke TikTok.")
-            clips = output.get("urls", [])
+            st.success("Video berhasil di-upload ke R2!")
             
-            with video_container:
-                cols = st.columns(3)
-                for i, clip in enumerate(clips):
-                    with cols[i % 3]:
-                        st.video(clip)
-                        st.markdown(f"[⬇️ Download Klip]({clip})")
-            break
-        elif status in ["FAILED", "error"]:
-            status_placeholder.error("❌ Mesin Gagal Panen. Tembok keamanan server RunPod jebol (Timeout).")
-            break
-        else:
-            status_placeholder.warning(f"Status Mesin: {status} ... (AI sedang kerja keras membedah video, update tiap 5 detik)")
-            time.sleep(5)
+            # Panggil RunPod
+            runpod_url = "https://api.runpod.ai/v2/mj3o3oohv9up54/run" 
+            headers = {"Authorization": f"Bearer {os.environ['RUNPOD_API_KEY']}"}
+            payload = {"input": {"video_url": video_url}}
+            
+            response = requests.post(runpod_url, json=payload, headers=headers)
+            st.write("Mesin sedang bekerja, cek tab Logs di RunPod!")
+            
+        except Exception as e:
+            st.error(f"Error: {e}")
