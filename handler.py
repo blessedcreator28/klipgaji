@@ -7,7 +7,9 @@ import subprocess
 import whisper
 from supabase import create_client
 
+print("🔥 MEMANASKAN MESIN: Memuat otak AI Whisper (Small)...")
 model = whisper.load_model("small") 
+print("✅ Otak AI siap membantai!")
 
 def generate_mrbeast_subs(words, clip_start, ass_path):
     ass_header = """[Script Info]
@@ -45,6 +47,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 def handler(job):
     try:
+        print("--- 📥 JOB BARU MASUK ---")
         supabase_url = "https://dfqegfdehvpttslbzzjv.supabase.co"
         supabase_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRmcWVnZmRlaHZwdHRzbGJ6emp2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2OTQwOTgsImV4cCI6MjA5MzI3MDA5OH0.QhklGaVToBBwesBcXh-Y34RRGQSL9EKU7CfYbDJzvC0"
         
@@ -52,18 +55,30 @@ def handler(job):
         job_input = job.get('input', {})
         video_url = job_input.get('video_url')
         
-        if not video_url: return {"status": "error", "message": "No video_url"}
+        if not video_url: 
+            print("❌ ERROR: URL Video kosong!")
+            return {"status": "error", "message": "No video_url"}
 
+        print(f"🔗 URL Video diterima: {video_url}")
         unique_id = str(uuid.uuid4())[:8]
         video_path = f"/tmp/input_{unique_id}.mp4"
         
-        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        print("⬇️ Mulai menyedot video dari Supabase...")
+        headers = {'User-Agent': 'Mozilla/5.0'}
         r = requests.get(video_url, stream=True, headers=headers)
         r.raise_for_status() 
         
         with open(video_path, 'wb') as f:
             for chunk in r.iter_content(chunk_size=8192): f.write(chunk)
                 
+        file_size = os.path.getsize(video_path)
+        print(f"✅ Download selesai! Ukuran file: {file_size / (1024*1024):.2f} MB")
+        
+        if file_size < 100000:
+            print("❌ ERROR: File terlalu kecil (Corrupt/Gagal Upload).")
+            return {"status": "error", "message": "File video corrupt atau gagal di-upload penuh."}
+
+        print("🧠 AI mulai membedah audio (Transcribe)... Ini butuh tenaga ekstra.")
         result = model.transcribe(video_path, language="id", word_timestamps=True)
         segments = result.get("segments", [])
         
@@ -83,15 +98,21 @@ def handler(job):
             if duration >= 40.0:
                 clips.append(current_clip)
                 current_clip = {"start": 0, "end": 0, "words": []}
-                # BUKA GEMBOK: Maksimal 100 klip
                 if len(clips) >= 100: break 
                 
         if current_clip["words"] and (current_clip["end"] - current_clip["start"] >= 20.0) and len(clips) < 100:
             clips.append(current_clip)
 
+        print(f"✂️ Selesai bedah otak! Ditemukan {len(clips)} klip daging potensial.")
+
+        if len(clips) == 0:
+            print("⚠️ WARNING: Tidak ada percakapan yang bisa dijadikan klip.")
+            return {"status": "error", "message": "AI tidak mendeteksi percakapan yang valid untuk dijadikan klip."}
+
         clip_urls = []
         
         for i, c in enumerate(clips):
+            print(f"🎬 Merakit Klip ke-{i+1} dari {len(clips)} (Pemotongan + Teks MrBeast)...")
             clip_start = c["start"]
             clip_end = c["end"]
             duration = clip_end - clip_start
@@ -114,6 +135,7 @@ def handler(job):
             
             subprocess.run(ffmpeg_cmd, check=True)
 
+            print(f"☁️ Upload Klip ke-{i+1} ke brankas Supabase...")
             with open(output_path, "rb") as f:
                 supabase.storage.from_("videos").upload(path=f"clip_{unique_id}_{i}.mp4", file=f)
             
@@ -123,9 +145,13 @@ def handler(job):
             os.remove(ass_path)
 
         if os.path.exists(video_path): os.remove(video_path)
+        print("🔥 --- SEMUA KLIP SUKSES DIPANEN --- 🔥")
         return {"status": "success", "urls": clip_urls}
 
     except Exception as e:
-        return {"status": "error", "message": str(e), "traceback": traceback.format_exc()}
+        error_msg = str(e)
+        print(f"!!! CRASH BRUTAL !!! {error_msg}")
+        print(traceback.format_exc())
+        return {"status": "error", "message": error_msg, "traceback": traceback.format_exc()}
 
 runpod.serverless.start({"handler": handler})

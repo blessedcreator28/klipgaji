@@ -11,7 +11,6 @@ RUNPOD_ENDPOINT_ID = "mj3o3oohv9up54"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# LAYOUT WIDE BUKAN CENTERED
 st.set_page_config(page_title="KlipGaji - Auto Viral", layout="wide")
 st.markdown("""
 <style>
@@ -26,10 +25,10 @@ st.session_state.authenticated = True
 st.title("🔥 KlipGaji (Dev Mode)")
 st.markdown("Mesin pencetak klip otomatis untuk dominasi market lokal. Upload, tinggal tidur, panen!")
 
-uploaded_file = st.file_uploader("Upload Video Mentah Lo Di Sini", type=['mp4', 'mov'])
+uploaded_file = st.file_uploader("Upload Video Mentah Lo Di Sini (Batas Aman: Max 200MB / ~15 Menit)", type=['mp4', 'mov'])
 
 if uploaded_file and st.button("Proses Video"):
-    with st.spinner("Mengamankan video ke brankas..."):
+    with st.spinner("Mengamankan video ke brankas... (Jangan tutup halaman)"):
         file_ext = uploaded_file.name.split('.')[-1]
         unique_filename = f"input_raw_{int(time.time())}.{file_ext}"
         
@@ -65,12 +64,17 @@ if uploaded_file and st.button("Proses Video"):
         status = status_resp.get("status")
         
         if status == "COMPLETED":
-            status_placeholder.success("🔥 PANEN SELESAI! Klip siap dihajar ke TikTok.")
             output = status_resp.get("output", {})
+            
+            # PROTEKSI BARU: Cek kalau AI diam-diam ngeluarin status Error
+            if isinstance(output, dict) and output.get("status") == "error":
+                status_placeholder.error(f"❌ MESIN NABRAK TEMBOK: {output.get('message')}")
+                break
+                
+            status_placeholder.success("🔥 PANEN SELESAI! Klip siap dihajar ke TikTok.")
             clips = output.get("urls", [])
             
             with video_container:
-                # --- SISTEM GRID KE SAMPING (3 KOLOM) ---
                 cols = st.columns(3)
                 for i, clip in enumerate(clips):
                     with cols[i % 3]:
@@ -78,8 +82,8 @@ if uploaded_file and st.button("Proses Video"):
                         st.markdown(f"[⬇️ Download Klip]({clip})")
             break
         elif status in ["FAILED", "error"]:
-            status_placeholder.error("❌ Mesin Gagal Panen. Cek log AI.")
+            status_placeholder.error("❌ Mesin Gagal Panen. Tembok keamanan server RunPod jebol (Timeout).")
             break
         else:
-            status_placeholder.warning(f"Status Mesin: {status} ... (AI sedang merakit, update tiap 5 detik)")
+            status_placeholder.warning(f"Status Mesin: {status} ... (AI sedang kerja keras membedah video, update tiap 5 detik)")
             time.sleep(5)
