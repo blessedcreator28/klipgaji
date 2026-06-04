@@ -7,7 +7,7 @@ import subprocess
 import whisper
 from supabase import create_client
 
-model = whisper.load_model("tiny") 
+model = whisper.load_model("small") 
 
 def generate_mrbeast_subs(words, clip_start, ass_path):
     # Racikan rahasia: Subtitle ASS gaya MrBeast (Word-by-word, Kuning, Outline Hitam Tebal, Posisi Tengah)
@@ -18,7 +18,7 @@ PlayResY: 1920
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: MrBeast,Arial,130,&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,10,5,2,10,10,800,1
+Style: MrBeast,Arial,130,&H0000FFFF,&H000000FF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,10,5,2,10,10,600,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
