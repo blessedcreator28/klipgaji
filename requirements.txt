@@ -1,3 +1,5 @@
-streamlit
+runpod
 requests
+openai-whisper
+boto3
 supabase
