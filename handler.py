@@ -1,4 +1,3 @@
-cat <<EOF > handler.py
 import runpod
 import sys
 
@@ -11,4 +10,3 @@ def handler(job):
     return {"status": "success", "message": "Handler is working"}
 
 runpod.serverless.start({"handler": handler})
-EOF
