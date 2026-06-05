@@ -1,9 +1,15 @@
 import runpod
+import logging
+import sys
 
-print("--- [BOOT TEST] SCRIPT BERHASIL DIMUAT ---", flush=True)
+# Konfigurasi logger biar langsung muncul
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+logger = logging.getLogger(__name__)
+
+logger.info("--- [DEBUG] SCRIPT BERHASIL DIPANGGIL ---")
 
 def handler(job):
-    print("--- [HANDLER] FUNGSI DIPANGGIL ---", flush=True)
+    logger.info(f"--- [HANDLER] JOB DITERIMA: {job.get('id')} ---")
     return {"status": "success", "message": "Test successful"}
 
 runpod.serverless.start({"handler": handler})

@@ -1,5 +1,7 @@
 runpod
-requests
-openai-whisper
+whisper
+torch
+torchaudio
 boto3
 supabase
+requests
