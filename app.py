@@ -8,7 +8,7 @@ from supabase import create_client
 
 # --- MANUAL: ISI KEY DI BAWAH INI ---
 RUNPOD_API_KEY = "rpa_I4UJDB6G4QB0E6HJJBG3ZQJC1DRUS70A2NTXIDBPffi5bv" # Ganti ini
-ENDPOINT_ID = "mj3o3oohv9up54" # ID Endpoint lo
+ENDPOINT_ID = "8xt58348tekm24" # ID Endpoint lo
 # ------------------------------------
 
 # Inisialisasi R2
