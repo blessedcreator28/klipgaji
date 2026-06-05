@@ -1,3 +1,4 @@
+cat <<EOF > handler.py
 import runpod
 import os
 import boto3
@@ -46,3 +47,4 @@ def handler(job):
         return {"status": "error", "message": str(e)}
 
 runpod.serverless.start({"handler": handler})
+EOF
