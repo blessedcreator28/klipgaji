@@ -33,7 +33,7 @@ if uploaded_file and st.button("Proses Video"):
             st.success("Video berhasil di-upload ke R2!")
             
             # Panggil RunPod
-            runpod_url = "https://api.runpod.ai/v2/mj3o3oohv9up54/run" 
+            runpod_url = "https://api.runpod.ai/v2/b06tr4ms0r49ue/run" 
             headers = {"Authorization": f"Bearer {os.environ['RUNPOD_API_KEY']}"}
             payload = {"input": {"video_url": video_url}}
             
