@@ -23,3 +23,13 @@ RUN mkdir -p /app/models && python3 -c "import whisper; whisper.load_model('smal
 COPY . .
 
 CMD ["python3", "handler.py"]
+
+FROM nvidia/cuda:11.8.0-runtime-ubuntu22.04
+...
+
+# Buat folder, download, dan buka izin aksesnya (777)
+RUN mkdir -p /app/models && \
+    python3 -c "import whisper; whisper.load_model('small', download_root='/app/models')" && \
+    chmod -R 777 /app/models
+# ---------------------------
+...
