@@ -14,10 +14,11 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# --- BARIS SAKTI INI YANG BIKIN CEPET ---
-# Mendownload model whisper 'small' saat build agar tidak download saat runtime
-RUN python3 -c "import whisper; whisper.load_model('small')"
-# ----------------------------------------
+# --- KUNCI LOKASI MODEL ---
+# Kita buat folder khusus dan download model ke sana saat build
+ENV WHISPER_CACHE_DIR=/app/models
+RUN mkdir -p /app/models && python3 -c "import whisper; whisper.load_model('small', download_root='/app/models')"
+# --------------------------
 
 COPY . .
 
