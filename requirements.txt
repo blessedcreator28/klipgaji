@@ -1,7 +1,1 @@
 runpod
-whisper
-torch
-torchaudio
-boto3
-supabase
-requests

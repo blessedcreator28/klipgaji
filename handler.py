@@ -1,15 +1,14 @@
+cat <<EOF > handler.py
 import runpod
-import logging
 import sys
 
-# Konfigurasi logger biar langsung muncul
-logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-logger = logging.getLogger(__name__)
-
-logger.info("--- [DEBUG] SCRIPT BERHASIL DIPANGGIL ---")
+# Konfigurasi log paling dasar
+sys.stdout.reconfigure(line_buffering=True)
+print("--- [BOOT] SCRIPT LOADED ---", flush=True)
 
 def handler(job):
-    logger.info(f"--- [HANDLER] JOB DITERIMA: {job.get('id')} ---")
-    return {"status": "success", "message": "Test successful"}
+    print("--- [HANDLER] JOB RECEIVED ---", flush=True)
+    return {"status": "success", "message": "Handler is working"}
 
 runpod.serverless.start({"handler": handler})
+EOF
