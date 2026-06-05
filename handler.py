@@ -1,31 +1,31 @@
-cat <<EOF > handler.py
 import runpod
 import os
 import sys
-import boto3
-import subprocess
-import traceback
-from faster_whisper import WhisperModel
 
-# Konfigurasi log
-sys.stdout.reconfigure(line_buffering=True)
-print("--- [BOOT] SCRIPT LOADED ---", flush=True)
-
-# Load model dari folder lokal
-try:
-    print("--- [MODEL] LOADING LOCAL WHISPER MODEL ---", flush=True)
-    model = WhisperModel("/app/whisper-model", device="cuda", compute_type="float16")
-    print("--- [MODEL] LOADED ---", flush=True)
-except Exception as e:
-    print(f"--- [CRITICAL] FAILED TO LOAD MODEL: {str(e)} ---", flush=True)
-    model = None
+# Kita pake print yang paling basic
+print("--- [DEBUG] STARTING SCRIPT ---", flush=True)
 
 def handler(job):
-    print(f"--- [HANDLER] JOB RECEIVED ---", flush=True)
-    if model is None:
-        return {"status": "error", "message": "Model not loaded"}
+    print("--- [DEBUG] HANDLER STARTED ---", flush=True)
     
+    # IMPORT DI DALAM SINI (Biar gak crash di awal)
     try:
+        print("--- [DEBUG] IMPORTING LIBRARIES ---", flush=True)
+        import boto3
+        import subprocess
+        from faster_whisper import WhisperModel
+        print("--- [DEBUG] IMPORTS SUCCESS ---", flush=True)
+        
+        print("--- [DEBUG] LOADING MODEL ---", flush=True)
+        model = WhisperModel("/app/whisper-model", device="cuda", compute_type="float16")
+        print("--- [DEBUG] MODEL LOADED ---", flush=True)
+    except Exception as e:
+        print(f"--- [CRITICAL ERROR DURING INIT] {str(e)} ---", flush=True)
+        return {"status": "error", "message": f"Init failed: {str(e)}"}
+
+    try:
+        # Sisanya logika download & proses
+        print("--- [DEBUG] DOWNLOADING ---", flush=True)
         s3 = boto3.client('s3',
             endpoint_url=os.environ['R2_ENDPOINT'],
             aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
@@ -42,16 +42,14 @@ def handler(job):
         s3.download_file(os.environ['R2_BUCKET'], filename, video_path)
         subprocess.run(["ffmpeg", "-y", "-i", video_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", audio_path], check=True)
         
-        print("--- [WHISPER] START TRANSCRIBING ---", flush=True)
+        print("--- [DEBUG] TRANSCRIBING ---", flush=True)
         segments, info = model.transcribe(audio_path, beam_size=5)
         full_text = " ".join([segment.text for segment in segments])
         
         return {"status": "success", "transcript": full_text}
         
     except Exception as e:
-        error_msg = traceback.format_exc()
-        print(f"--- [CRITICAL ERROR] ---\n{error_msg}", flush=True)
+        print(f"--- [CRITICAL ERROR DURING RUN] {str(e)} ---", flush=True)
         return {"status": "error", "message": str(e)}
 
 runpod.serverless.start({"handler": handler})
-EOF
