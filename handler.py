@@ -8,8 +8,11 @@ import torch
 import sys
 from supabase import create_client
 
+# Force unbuffered logging
 sys.stdout.reconfigure(line_buffering=True)
+print("--- [SYSTEM] STARTING WORKER (GPU MODE) ---", flush=True)
 
+# Inisialisasi
 s3 = boto3.client('s3',
     endpoint_url=os.environ['R2_ENDPOINT'],
     aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
@@ -17,12 +20,13 @@ s3 = boto3.client('s3',
     region_name='auto'
 )
 
-print("--- [DEBUG] LOADING MODEL... ---", flush=True)
-model = whisper.load_model('small', download_root='/app/models')
-print("--- [DEBUG] MODEL LOADED ---", flush=True)
+# PAKSA PAKAI GPU
+print("--- [DEBUG] LOADING MODEL TO GPU... ---", flush=True)
+model = whisper.load_model('small', device='cuda', download_root='/app/models')
+print("--- [DEBUG] MODEL LOADED ON GPU SUCCESSFULLY ---", flush=True)
 
 def handler(job):
-    print("--- [DEBUG] JOB START ---", flush=True)
+    print(f"--- [JOB] {job.get('id')} RECEIVED ---", flush=True)
     try:
         job_input = job.get('input', {})
         video_url = job_input.get('video_url')
@@ -35,15 +39,13 @@ def handler(job):
         s3.download_file(os.environ['R2_BUCKET'], filename, video_path)
         
         print("--- [DEBUG] FFMPEG START ---", flush=True)
-        # Hapus capture_output biar log langsung ke dashboard
         subprocess.run(["ffmpeg", "-y", "-i", video_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", audio_path], check=True)
         print("--- [DEBUG] FFMPEG SUCCESS ---", flush=True)
         
-        print("--- [DEBUG] TRANSCRIBE START ---", flush=True)
-        result = model.transcribe(audio_path, language="id", word_timestamps=True)
+        # TRANSKRIPSI PAKSA GPU & FP16 FALSE (Biar nggak rewel)
+        print("--- [DEBUG] TRANSCRIBE START (GPU) ---", flush=True)
+        result = model.transcribe(audio_path, language="id", word_timestamps=True, fp16=False)
         print("--- [DEBUG] TRANSCRIBE SUCCESS ---", flush=True)
-        
-        # ... (Logika clipping & upload tetap di bawah sini) ...
         
         return {"status": "success", "message": "Done"}
         
