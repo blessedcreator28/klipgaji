@@ -31,3 +31,10 @@ def handler(job):
         return {"status": "error", "message": error_msg}
 
 runpod.serverless.start({"handler": handler})
+
+# ... (atasnya sama)
+# Load model (pakai local_files_only=True supaya dia ambil dari cache yang udah kita "panggang" di Dockerfile)
+print("--- [MODEL] LOADING WHISPER MODEL ---", flush=True)
+model = WhisperModel("base", device="cuda", compute_type="float16", local_files_only=True)
+print("--- [MODEL] LOADED ---", flush=True)
+# ... (bawahnya sama)
