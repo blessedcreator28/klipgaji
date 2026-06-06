@@ -3,11 +3,10 @@ import sys
 
 # Flush log biar muncul
 sys.stdout.reconfigure(line_buffering=True)
-print("--- [DIAGNOSTIC] SCRIPT STARTING ---", flush=True)
+print("--- [DEBUG] PYTHON SCRIPT BERHASIL JALAN ---", flush=True)
 
 def handler(job):
-    print("--- [DIAGNOSTIC] HANDLER RUNNING ---", flush=True)
-    return {"status": "success", "message": "Container is alive"}
+    print("--- [DEBUG] HANDLER DIPANGGIL ---", flush=True)
+    return {"status": "success", "message": "OK"}
 
-# Ini cara standar runpod
 runpod.serverless.start({"handler": handler})
