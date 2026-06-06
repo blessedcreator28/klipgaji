@@ -1,3 +1,4 @@
+cat <<EOF > handler.py
 import runpod
 import os
 import boto3
@@ -5,7 +6,6 @@ import subprocess
 import sys
 from faster_whisper import WhisperModel
 
-# Buffer logs biar langsung keluar tanpa nunggu
 sys.stdout.reconfigure(line_buffering=True)
 
 # Load model di awal
@@ -41,7 +41,8 @@ def handler(job):
     s3.download_file(os.environ['R2_BUCKET'], filename, video_path)
     subprocess.run(["ffmpeg", "-y", "-i", video_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", audio_path], check=True)
     
-    segments, _ = model.transcribe(audio_path, beam_size=5)
+    # SPEED OPTIMIZED: beam_size=1
+    segments, _ = model.transcribe(audio_path, beam_size=1)
     clips = get_smart_clips(list(segments))
     
     response_data = []
@@ -60,3 +61,4 @@ def handler(job):
     return {"status": "success", "clips": response_data}
 
 runpod.serverless.start({"handler": handler})
+EOF
