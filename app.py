@@ -1,50 +1,75 @@
 import streamlit as st
 import boto3
-import os
-import uuid
 import requests
-import json
-from supabase import create_client
+import time  # Wajib ditambahin buat ngasih jeda ngecek
 
-# --- MANUAL: ISI KEY DI BAWAH INI ---
-RUNPOD_API_KEY = "rpa_I4UJDB6G4QB0E6HJJBG3ZQJC1DRUS70A2NTXIDBPffi5bv" # Ganti ini
-ENDPOINT_ID = "8xt58348tekm24" # ID Endpoint lo
-# ------------------------------------
+# --- KONFIGURASI LOKAL ---
+R2_ENDPOINT = "https://df3050e61e1819164a9f528c7eddaa86.r2.cloudflarestorage.com"
+AWS_KEY = "b33eb75134afc31f82a16aac4dbee7d6"
+AWS_SECRET = "3b643d675df524f4ca2595c1a5df87876774646ea96a6589b36a836700bb9f04"
+BUCKET_NAME = "klipgaji-bucket"
+RUNPOD_API_KEY = "rpa_I4UJDB6G4QB0E6HJJBG3ZQJC1DRUS70A2NTXIDBPffi5bv"
+RUNPOD_ENDPOINT_ID = "8xt58348tekm24"
 
-# Inisialisasi R2
-s3 = boto3.client('s3',
-    endpoint_url=os.environ['R2_ENDPOINT'],
-    aws_access_key_id=os.environ['AWS_ACCESS_KEY_ID'],
-    aws_secret_access_key=os.environ['AWS_SECRET_ACCESS_KEY'],
-    region_name='auto'
-)
+def upload_to_r2(file):
+    s3 = boto3.client('s3', 
+                      endpoint_url=R2_ENDPOINT,
+                      aws_access_key_id=AWS_KEY,
+                      aws_secret_access_key=AWS_SECRET,
+                      region_name='auto')
+    s3.upload_fileobj(file, BUCKET_NAME, file.name)
+    return file.name
 
-st.title("🔥 KlipGaji Debugger")
-uploaded_file = st.file_uploader("Upload Video", type=['mp4'])
+def trigger_runpod(video_name):
+    # 1. Kirim tugas (Pakai endpoint /run, BUKAN /runsync)
+    url_run = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run"
+    headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}", "Content-Type": "application/json"}
+    payload = {"input": {"video_url": video_name}}
+    
+    response = requests.post(url_run, json=payload, headers=headers)
+    job_data = response.json()
+    job_id = job_data.get('id')
+    
+    if not job_id:
+        return {"error": "Gagal bikin antrean di RunPod", "detail": job_data}
+
+    # 2. Sistem Mandor (Ngecek status tiap 5 detik)
+    url_status = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
+    
+    while True:
+        status_res = requests.get(url_status, headers=headers).json()
+        status = status_res.get('status')
+        
+        if status == 'COMPLETED':
+            return status_res
+        elif status in ['FAILED', 'CANCELLED']:
+            return status_res
+        
+        # Kalau masih IN_QUEUE atau IN_PROGRESS, tunggu 5 detik lalu cek lagi
+        time.sleep(5)
+
+# --- UI STREAMLIT ---
+st.title("Jagoan Clipper MVP")
+uploaded_file = st.file_uploader("Upload video lo (format MP4)", type=['mp4'])
 
 if uploaded_file and st.button("Proses Video"):
-    st.write("1. Mengupload ke R2...")
     try:
-        unique_filename = f"{uuid.uuid4()}.mp4"
-        s3.upload_fileobj(uploaded_file, os.environ['R2_BUCKET'], unique_filename)
-        video_url = f"{os.environ['R2_ENDPOINT']}/{os.environ['R2_BUCKET']}/{unique_filename}"
-        st.write(f"✅ R2 Upload Sukses: {video_url}")
+        with st.spinner("Upload ke R2..."):
+            filename = upload_to_r2(uploaded_file)
+            st.write(f"Berhasil upload: {filename}")
         
-        # DEBUG HANDSHAKE
-        st.write("2. Menghubungi RunPod...")
-        url = f"https://api.runpod.ai/v2/{ENDPOINT_ID}/run"
-        headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}", "Content-Type": "application/json"}
-        payload = {"input": {"video_url": video_url}}
-        
-        response = requests.post(url, json=payload, headers=headers)
-        
-        st.write(f"📡 Response Status Code: {response.status_code}")
-        st.write(f"📡 Response Body: {response.text}")
-        
-        if response.status_code == 200:
-            st.success("✅ Berhasil menembak ke RunPod!")
+        with st.spinner("AI sedang memproses klip... Ini butuh waktu, jangan di-refresh ya Bro!"):
+            result = trigger_runpod(filename)
+            
+        if result.get("status") == "COMPLETED" and "output" in result:
+            st.success("Selesai! AI berhasil motong video lo.")
+            clips = result['output'].get('clips', [])
+            for clip in clips:
+                st.video(clip['url'])
+                st.write(f"**Transkrip:** {clip['text']}")
+                st.write(f"---")
         else:
-            st.error("❌ Gagal menembak ke RunPod. Cek API Key atau Endpoint ID.")
+            st.error(f"Error atau Gagal dari RunPod: {result}")
             
     except Exception as e:
-        st.error(f"❌ Error Detail: {str(e)}")
+        st.error(f"Terjadi kesalahan: {e}")
