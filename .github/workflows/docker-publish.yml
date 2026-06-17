@@ -15,6 +15,6 @@ jobs:
     - name: Build and push
       uses: docker/build-push-action@v4
       with:
-        context: ./clipper-baru
+        context: .
         push: true
         tags: blessedcreator/klipgaji-worker:v6
