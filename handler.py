@@ -4,13 +4,13 @@ import boto3
 import subprocess
 import sys
 
-# Konfigurasi agar log keluar real-time di console RunPod
+# Konfigurasi log agar keluar di dashboard RunPod
 sys.stdout.reconfigure(line_buffering=True)
 from faster_whisper import WhisperModel
 
 print("--- INITIALIZING MODEL ---")
 try:
-    # Load model sekali saja saat container start
+    # Load model sekali saat container start
     model = WhisperModel("Systran/faster-whisper-small", device="cuda", compute_type="float16")
     print("--- MODEL LOADED SUCCESSFULLY ---")
 except Exception as e:
@@ -27,7 +27,7 @@ def get_smart_clips(segments):
         current['end'] = seg['end']
         duration = current['end'] - current['start']
         
-        # Logika potong klip
+        # Logika potong klip: durasi minimal 30s atau maksimal 60s
         if (duration >= 30 and any(p in seg['text'] for p in ['.', '!', '?'])) or duration >= 60:
             clips.append(current)
             current = {'start': seg['end'], 'end': 0, 'text': ""}
@@ -61,7 +61,7 @@ def handler(job):
         print(f"Downloading {filename}...")
         s3.download_file(r2_bucket, filename, video_path)
         
-        # FFmpeg extract
+        # FFmpeg extract audio
         print("Extracting audio...")
         subprocess.run(["ffmpeg", "-y", "-i", video_path, "-vn", "-acodec", "pcm_s16le", "-ar", "16000", "-ac", "1", audio_path], check=True)
         
@@ -75,12 +75,15 @@ def handler(job):
         clips = get_smart_clips(safe_segments)
         
         response_data = []
+        # Filter FFmpeg: Portrait 1080x1920 + Blur Background
         filter_complex = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,boxblur=20:10[bg];[0:v]scale=1080:1920:force_original_aspect_ratio=decrease[fg];[bg][fg]overlay=(W-w)/2:(H-h)/2"
         
         for i, clip in enumerate(clips):
             clip_name = f"clip_{i}_{filename}"
             clip_path = f"/tmp/{clip_name}"
             
+            print(f"Processing clip {i}...")
+            # FIXED: Menghapus titik salah ketik sebelumnya di '-vf'
             subprocess.run([
                 "ffmpeg", "-y", "-ss", str(clip['start']), "-i", video_path, "-t", str(clip['end'] - clip['start']),
                 "-vf", filter_complex, "-c:v", "libx264", "-crf", "23", "-preset", "veryfast", clip_path
@@ -95,6 +98,5 @@ def handler(job):
         print(f"HANDLER ERROR: {str(e)}")
         return {"status": "failed", "error": str(e)}
 
-# KUNCI UTAMA: Agar program tetap hidup menunggu request dan tidak exit(0)
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})
