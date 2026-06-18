@@ -1,4 +1,4 @@
-# Menggunakan base image yang sudah include CUDA agar GPU bisa jalan
+# Menggunakan base image NVIDIA yang sudah include CUDA & cuDNN
 FROM nvidia/cuda:12.1.0-cudnn8-runtime-ubuntu22.04
 
 # Install Python, pip, dan ffmpeg
