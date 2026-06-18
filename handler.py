@@ -7,7 +7,7 @@ import sys
 sys.stdout.reconfigure(line_buffering=True)
 from faster_whisper import WhisperModel
 
-model = WhisperModel("/app/whisper-model", device="cuda", compute_type="float16")
+model = WhisperModel("small", device="cuda", compute_type="float16")
 
 def get_smart_clips(segments):
     clips = []
