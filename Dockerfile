@@ -1,15 +1,25 @@
-FROM runpod/base:0.6.0-cuda12.1.0
+# Ganti pakai base image resmi NVIDIA yang super stabil
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
 
-# Install ffmpeg
-RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
+# Set environment agar instalasi tidak meminta input manual
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install library utama
-RUN pip3 install runpod boto3 faster-whisper nvidia-cublas-cu12 nvidia-cudnn-cu12
+# Install Python, pip, dan FFmpeg secara bersih
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
-# Baris pemecah cache (WAJIB biar Docker nge-refresh handler.py baru)
-RUN echo "Build Terakhir Sore Ini"
+# Upgrade pip ke versi terbaru
+RUN pip3 install --no-cache-dir --upgrade pip
 
+# Install semua library yang dibutuhkan handler lo
+RUN pip3 install --no-cache-dir runpod boto3 faster-whisper
+
+# Copy semua file project lo
 COPY . /app
 WORKDIR /app
 
+# Perintah eksekusi utama
 CMD ["python3", "handler.py"]
