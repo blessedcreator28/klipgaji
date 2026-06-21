@@ -1,17 +1,24 @@
-# Ganti ke versi cudnn8 agar faster-whisper bisa jalan di GPU
-FROM nvidia/cuda:11.8.0-cudnn8-runtime-ubuntu22.04
+# Pake versi yang lebih lengkap (devel) biar library pendukung GPU ada semua
+FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
 
-RUN apt-get update && apt-get install -y python3-pip ffmpeg git && rm -rf /var/lib/apt/lists/*
+# Set environment biar ga minta input pas install
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    ffmpeg \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 
-# Install semua library
-RUN pip install --no-cache-dir runpod boto3 faster-whisper huggingface_hub
+# Upgrade pip biar install library ga error
+RUN pip install --no-cache-dir --upgrade pip
 
-# Pre-download model
-RUN mkdir -p /app/whisper-model && \
-    python3 -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-base', local_dir='/app/whisper-model')"
+# Install library utama
+RUN pip install --no-cache-dir runpod boto3 faster-whisper
 
 COPY . .
 
+# Biarkan RunPod yang panggil handler.py
 CMD ["python3", "handler.py"]
