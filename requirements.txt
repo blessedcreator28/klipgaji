@@ -1,3 +1,4 @@
 runpod
 boto3
 faster-whisper
+moviepy

@@ -1,8 +1,10 @@
 import runpod
 import boto3
 import os
+from faster_whisper import WhisperModel
+from moviepy.video.io.VideoFileClip import VideoFileClip
 
-# Setup client R2 dengan key yang sudah lo sesuaikan
+# Setup client R2
 s3 = boto3.client(
     's3',
     endpoint_url=os.getenv('R2_ENDPOINT'),
@@ -11,28 +13,38 @@ s3 = boto3.client(
     region_name='auto'
 )
 
+# Load model Whisper (Base/Small biar cepet)
+model = WhisperModel("base", device="cuda", compute_type="float16")
+
 def handler(event):
     job_input = event.get("input", {})
     s3_key = job_input.get("s3_key")
-    # Pastikan folder tmp ada
     local_path = f"/tmp/{s3_key}"
 
-    if not s3_key:
-        return {"status": "error", "message": "s3_key tidak ada di input"}
-
     try:
-        # Download dari R2
-        print(f"Mulai download: {s3_key} dari bucket {os.getenv('R2_BUCKET')}")
+        # 1. Download
         s3.download_file(os.getenv('R2_BUCKET'), s3_key, local_path)
         
-        if os.path.exists(local_path):
-            file_size = os.path.getsize(local_path)
-            return {
-                "status": "success", 
-                "message": f"File berhasil didownload, ukuran: {file_size} bytes"
-            }
-        else:
-            return {"status": "error", "message": "File tidak ditemukan setelah download"}
+        # 2. Transkripsi (Faster-Whisper)
+        segments, _ = model.transcribe(local_path, beam_size=5)
+        transcript = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
+        
+        # 3. Clipping (Contoh: Potong 10 detik pertama sebagai tes)
+        output_path = f"/tmp/clip_{s3_key}"
+        with VideoFileClip(local_path) as video:
+            new_clip = video.subclip(0, 10)
+            new_clip.write_videofile(output_path, codec="libx264")
+        
+        # 4. Upload Balik ke R2
+        output_key = f"clips/clip_{s3_key}"
+        s3.upload_file(output_path, os.getenv('R2_BUCKET'), output_key)
+        
+        return {
+            "status": "success",
+            "message": "Proses selesai!",
+            "transcript_count": len(transcript),
+            "output_key": output_key
+        }
 
     except Exception as e:
         return {"status": "error", "message": str(e)}
