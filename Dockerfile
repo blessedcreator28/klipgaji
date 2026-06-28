@@ -22,4 +22,5 @@ COPY . .
 
 # Biarkan RunPod yang panggil handler.py
 # cache_buster_v16_jagoan_clipper
+# cache_buster_sprint_1_download
 CMD ["python3", "handler.py"]
