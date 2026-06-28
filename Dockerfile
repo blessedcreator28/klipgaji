@@ -21,4 +21,5 @@ RUN pip install --no-cache-dir runpod boto3 faster-whisper
 COPY . .
 
 # Biarkan RunPod yang panggil handler.py
+# cache_buster_v16_jagoan_clipper
 CMD ["python3", "handler.py"]
