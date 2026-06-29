@@ -22,7 +22,9 @@ jobs:
         uses: docker/build-push-action@v4
         with:
           push: true
-          # Kita paksa dia membuat tag 'latest' DAN tag dari git ref (v21)
+          # Menggunakan logika eksplisit:
+          # Jika push ke main, tag = latest
+          # Jika push tag, tag = nama tag (v21)
           tags: |
             blessedcreator/klipgaji-worker:latest
-            blessedcreator/klipgaji-worker:${{ github.ref_name }}
+            ${{ github.ref_type == 'tag' && format('blessedcreator/klipgaji-worker:{0}', github.ref_name) || '' }}
