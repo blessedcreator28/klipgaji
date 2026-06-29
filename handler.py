@@ -12,11 +12,20 @@ def handler(event):
     s3_key = job_input.get("s3_key")
     
     if not s3_key:
-        print("LOG: ERROR - s3_key tidak ditemukan!")
         return {"status": "error", "message": "s3_key missing"}
     
-    print(f"LOG: Berhasil memproses key: {s3_key}")
-    return {"status": "success", "message": "Handler V21 Berjalan Lancar"}
+    # 1. Simulasikan download
+    print(f"LOG: Downloading {s3_key} from S3...")
+    
+    # 2. Proses transkripsi/AI (Nanti kita isi di sini)
+    print(f"LOG: Starting AI Processing for {s3_key}...")
+    
+    # Placeholder return
+    return {
+        "status": "success", 
+        "message": "Video processing sequence initialized",
+        "processed_file": s3_key
+    }
 
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})
