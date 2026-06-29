@@ -6,18 +6,23 @@ import sys
 sys.stdout.reconfigure(line_buffering=True)
 
 def handler(event):
-    print("--- STARTING HANDLER V19 ---")
+    print("--- HANDLER STARTED ---")
     
-    # Debug info
-    print(f"DEBUG: Running from {os.getcwd()}")
+    # Ambil input dengan aman
+    job_input = event.get("input", {})
+    s3_key = job_input.get("s3_key")
     
-    # Simulate work
-    print("LOG: I am definitely the new code!")
+    if not s3_key:
+        print("ERROR: s3_key is missing in input!")
+        return {"status": "error", "message": "s3_key is missing"}
     
+    print(f"DEBUG: Processing key: {s3_key}")
+    
+    # Lanjut logika berikutnya...
     return {
-        "status": "success",
-        "message": "Handler V19 is active and running!",
-        "version": "19.0"
+        "status": "success", 
+        "message": "Input received successfully",
+        "received_key": s3_key
     }
 
 runpod.serverless.start({"handler": handler})
