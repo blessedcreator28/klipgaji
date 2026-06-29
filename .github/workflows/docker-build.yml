@@ -3,7 +3,8 @@ name: Build and Push Docker Image
 on:
   push:
     branches: [ main ]
-    tags: [ 'v*' ] # Memicu build saat ada tag baru seperti v21
+    tags: [ 'v*' ]
+  workflow_dispatch: # Biar bisa klik tombol "Run" manual dari web
 
 jobs:
   build:
