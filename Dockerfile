@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Pastikan handler.py ada di sana
-ENV PYTHONPATH=/app_v2
+ENV REFRESHED_AT=2026-06-29_15_30
 
 # Jalankan handler dari lokasi baru
 CMD ["python", "handler.py"]
