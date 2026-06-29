@@ -1,28 +1,17 @@
-# Pake versi yang lebih lengkap (devel) biar library pendukung GPU ada semua
-FROM nvidia/cuda:11.8.0-cudnn8-devel-ubuntu22.04
+FROM runpod/pytorch:2.0.1-py3.10-cuda11.8.0-devel
 
-# Set environment biar ga minta input pas install
-ENV DEBIAN_FRONTEND=noninteractive
+# Pindah ke folder baru biar gak kena cache folder lama
+WORKDIR /app_v2
 
-RUN apt-get update && apt-get install -y \
-    python3-pip \
-    ffmpeg \
-    git \
-    && rm -rf /var/lib/apt/lists/*
+# Copy requirements dan install
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-WORKDIR /app
-
-# Upgrade pip biar install library ga error
-RUN pip install --no-cache-dir --upgrade pip
-
-# Install library utama
-RUN pip install --no-cache-dir runpod boto3 faster-whisper
-
+# Copy semua file ke folder baru
 COPY . .
 
-# Biarkan RunPod yang panggil handler.py
-# cache_buster_v16_jagoan_clipper
-# cache_buster_sprint_1_download
-# cache_buster_sprint_2_ai_engine
-ENV REFRESHED_AT=2026-06-28_16_40
-CMD ["python3", "handler.py"]
+# Pastikan handler.py ada di sana
+ENV PYTHONPATH=/app_v2
+
+# Jalankan handler dari lokasi baru
+CMD ["python", "handler.py"]
