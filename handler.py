@@ -6,15 +6,17 @@ import sys
 sys.stdout.reconfigure(line_buffering=True)
 
 def handler(event):
-    print("--- HANDLER V20 STARTED ---")
+    print("--- LOG: HANDLER V21 AKTIF ---")
+    
     job_input = event.get("input", {})
     s3_key = job_input.get("s3_key")
     
     if not s3_key:
+        print("LOG: ERROR - s3_key tidak ditemukan!")
         return {"status": "error", "message": "s3_key missing"}
     
-    print(f"DEBUG: Processing {s3_key}")
-    return {"status": "success", "message": "Handler V20 Active"}
+    print(f"LOG: Berhasil memproses key: {s3_key}")
+    return {"status": "success", "message": "Handler V21 Berjalan Lancar"}
 
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})
