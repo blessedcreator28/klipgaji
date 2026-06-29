@@ -24,4 +24,5 @@ COPY . .
 # cache_buster_v16_jagoan_clipper
 # cache_buster_sprint_1_download
 # cache_buster_sprint_2_ai_engine
+ENV REFRESHED_AT=2026-06-28_16_40
 CMD ["python3", "handler.py"]
