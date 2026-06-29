@@ -1,18 +1,23 @@
 import runpod
 import os
+import sys
+
+# Force unbuffered output
+sys.stdout.reconfigure(line_buffering=True)
 
 def handler(event):
-    # Debug: Print lokasi file saat ini agar kita tahu skrip mana yang jalan
-    print(f"DEBUG: CURRENT FILE PATH: {__file__}")
+    print("--- STARTING HANDLER V19 ---")
     
-    # Cek isi folder /app atau / (root)
-    content = os.listdir('/')
-    print(f"DEBUG: ROOT DIRECTORY CONTENT: {content}")
+    # Debug info
+    print(f"DEBUG: Running from {os.getcwd()}")
+    
+    # Simulate work
+    print("LOG: I am definitely the new code!")
     
     return {
         "status": "success",
-        "message": "Script is live!",
-        "file_path": __file__
+        "message": "Handler V19 is active and running!",
+        "version": "19.0"
     }
 
 runpod.serverless.start({"handler": handler})
