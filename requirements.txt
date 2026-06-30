@@ -1,5 +1,4 @@
 runpod
 boto3
 faster-whisper
-moviepy
-openai-whisper
+ctranslate2

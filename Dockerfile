@@ -1,15 +1,19 @@
-FROM runpod/pytorch:2.0.1-py3.10-cuda11.8.0-devel
+# Gunakan image resmi NVIDIA yang sudah include semua library CUDA
+FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
 
-WORKDIR /app
+# Install python dan dependencies
+RUN apt-get update && apt-get install -y \
+    python3-pip \
+    python3-dev \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
 
-# Menghapus file sampah yang mungkin mengganggu
-RUN rm -f /main.py
-
+# Install library Python
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy handler
+COPY handler.py .
 
-# Memastikan Python menjalankan handler.py sebagai entrypoint utama
-ENV RUNPOD_DEBUG_LEVEL=debug
-CMD ["python", "handler.py"]
+# Jalankan
+CMD ["python3", "handler.py"]
