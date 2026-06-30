@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, stable ]
     tags: [ 'v*' ]
   workflow_dispatch:
 
@@ -19,7 +19,8 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build and push (latest)
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        # Kondisi sekarang sudah mencakup main ATAU stable
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stable')
         uses: docker/build-push-action@v4
         with:
           push: true
