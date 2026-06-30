@@ -2,9 +2,10 @@ import runpod
 import os
 import sys
 import boto3
+import re
 from faster_whisper import WhisperModel
 
-print("LOG: Init Model...")
+# Load model di luar handler
 model = WhisperModel("small", device="cuda", compute_type="float16")
 
 s3 = boto3.client(
@@ -16,20 +17,28 @@ s3 = boto3.client(
 )
 
 def handler(event):
-    print("--- LOG: HANDLER V22 START ---")
+    print("--- LOG: HANDLER V22 PROSES AI ---")
     job_input = event.get("input", {})
     s3_key = job_input.get("s3_key")
     bucket_name = os.environ.get("R2_BUCKET_NAME")
     
-    local_path = f"/tmp/{os.path.basename(s3_key)}"
+    if not s3_key:
+        return {"status": "error", "message": "s3_key missing"}
     
-    print(f"LOG: Downloading {s3_key}...")
+    # 1. Bersihkan nama file agar tidak ada karakter aneh
+    clean_name = re.sub(r'[^a-zA-Z0-9._-]', '_', s3_key)
+    local_path = f"/tmp/{clean_name}"
+    
+    # 2. Download
+    print(f"LOG: Downloading {s3_key} as {clean_name}...")
     s3.download_file(bucket_name, s3_key, local_path)
     
+    # 3. Transkripsi
     print(f"LOG: Transcribing...")
     segments, _ = model.transcribe(local_path, beam_size=5)
     transcription = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
     
+    # 4. Cleanup
     if os.path.exists(local_path): os.remove(local_path)
     return {"status": "success", "transcription": transcription}
 
