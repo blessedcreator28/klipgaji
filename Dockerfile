@@ -8,12 +8,16 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install library Python
+# Install library Python dari requirements.txt
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Copy handler
+# Install google-genai secara eksplisit untuk memastikan library "otak" terpasang
+RUN pip3 install --no-cache-dir google-genai
+
+# Copy handler dan analyzer (otak AI) ke dalam container
 COPY handler.py .
+COPY analyzer.py .
 
 # Jalankan
 CMD ["python3", "handler.py"]

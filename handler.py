@@ -1,17 +1,19 @@
-import runpod
 import os
-import boto3
 import re
+import boto3
+import runpod
 from faster_whisper import WhisperModel
 
-# 1. Konfigurasi Hardcoded (Anti-Cache)
-ENDPOINT_URL = "https://df3050e61e1819164a9f528c7eddaa86.r2.cloudflarestorage.com"
-ACCESS_KEY = "b33eb75134afc31f82a16aac4dbee7d6"
-SECRET_KEY = "3b643d675df524f4ca2595c1a5df87876774646ea96a6589b36a836700bb9f04"
-BUCKET_NAME = "klipgaji-bucket"
+# Import fungsi otak AI yang baru saja lo buat
+from analyzer import analyze_transcription 
 
-# 2. Inisialisasi Model & S3
-print("LOG: Loading Model...")
+# Load Credential R2
+ENDPOINT_URL = os.environ.get("R2_ENDPOINT")
+ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID")
+SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
+BUCKET_NAME = os.environ.get("R2_BUCKET")
+
+print("LOG: Loading Model Whisper...")
 model = WhisperModel("small", device="cuda", compute_type="float16")
 
 s3 = boto3.client(
@@ -23,30 +25,42 @@ s3 = boto3.client(
 )
 
 def handler(event):
-    print("--- LOG: HANDLER V25 PROSES AI ---")
+    print("--- LOG: HANDLER V27 (WHISPER + GEMINI) ---")
     job_input = event.get("input", {})
     s3_key = job_input.get("s3_key")
-    
+
     if not s3_key:
         return {"status": "error", "message": "s3_key missing"}
-    
-    # 3. Sanitasi Nama File
+
     clean_name = re.sub(r'[^a-zA-Z0-9._-]', '_', s3_key)
     local_path = f"/tmp/{clean_name}"
-    
-    # 4. Download dari R2
-    print(f"LOG: Downloading {s3_key}...")
+
+    print(f"LOG: Downloading {s3_key} from R2...")
     s3.download_file(BUCKET_NAME, s3_key, local_path)
-    
-    # 5. Transkripsi
-    print(f"LOG: Transcribing...")
+
+    print(f"LOG: Transcribing Video...")
     segments, _ = model.transcribe(local_path, beam_size=5)
     transcription = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
-    
-    # 6. Cleanup
-    if os.path.exists(local_path): os.remove(local_path)
-    
-    return {"status": "success", "transcription": transcription}
+
+    # --- PROSES ANALISIS VIRAL ---
+    print("LOG: Menganalisis momen viral dengan Gemini 2.5 Flash...")
+    try:
+        # Mengirim hasil transkripsi ke Gemini
+        viral_clips_data = analyze_transcription(transcription)
+    except Exception as e:
+        print(f"LOG: Error pada Gemini - {e}")
+        viral_clips_data = {"error": str(e)}
+
+    # Cleanup file lokal RunPod
+    if os.path.exists(local_path): 
+        os.remove(local_path)
+
+    # Mengembalikan output komplit
+    return {
+        "status": "success", 
+        "transcription": transcription,
+        "viral_clips": viral_clips_data
+    }
 
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})
