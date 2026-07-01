@@ -1,11 +1,14 @@
 import os
-import re
 import boto3
 import runpod
 import subprocess
+import google.generativeai as genai
 from faster_whisper import WhisperModel
-from supabase import create_client, Client
 from analyzer import analyze_transcription 
+
+# Konfigurasi Google Gemini (Penting untuk mengatasi Limit 429)
+genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+model_ai = genai.GenerativeModel('gemini-1.5-flash')
 
 # Load Credential R2
 ENDPOINT_URL = os.environ.get("R2_ENDPOINT")
@@ -24,19 +27,16 @@ def cut_and_upload(local_path, start, end, clip_index):
     duration = end - start
     
     try:
-        # 1. FFmpeg
         subprocess.run([
             "ffmpeg", "-y", "-ss", str(start), "-i", local_path, 
             "-t", str(duration), "-c:v", "libx264", "-c:a", "aac", output_path
         ], check=True, capture_output=True, text=True)
         
-        # 2. Upload
         if not os.path.exists(output_path):
-            return "ERROR: File output tidak ditemukan setelah ffmpeg"
+            return "ERROR: File output tidak ditemukan"
             
         s3.upload_file(output_path, BUCKET_NAME, output_filename, ExtraArgs={'ContentType': 'video/mp4'})
         os.remove(output_path)
-        
         return f"{PUBLIC_BUCKET_URL}/{output_filename}"
     
     except subprocess.CalledProcessError as e:
@@ -57,7 +57,6 @@ def handler(event):
         viral_clips_data = analyze_transcription(transcription)
 
         for clip in viral_clips_data:
-            # Panggil fungsi dan simpan error atau url langsung ke field clip_url
             result = cut_and_upload(local_path, clip['start_time'], clip['end_time'], viral_clips_data.index(clip))
             clip['clip_url'] = result 
 
