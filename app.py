@@ -2,9 +2,13 @@ import streamlit as st
 import boto3
 import requests
 import time
-import random # Buat generate viral score dummy
+import random
 
 # --- KONFIGURASI ---
+R2_ENDPOINT = "https://df3050e61e1819164a9f528c7eddaa86.r2.cloudflarestorage.com"
+AWS_KEY = "b33eb75134afc31f82a16aac4dbee7d6"
+AWS_SECRET = "3b643d675df524f4ca2595c1a5df87876774646ea96a6589b36a836700bb9f04"
+BUCKET_NAME = "klipgaji-bucket"
 RUNPOD_API_KEY = "rpa_I4UJDB6G4QB0E6HJJBG3ZQJC1DRUS70A2NTXIDBPffi5bv"
 RUNPOD_ENDPOINT_ID = "kik87fim663p19"
 
@@ -24,6 +28,11 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- FUNGSI ---
+def upload_to_r2(file):
+    s3 = boto3.client('s3', endpoint_url=R2_ENDPOINT, aws_access_key_id=AWS_KEY, aws_secret_access_key=AWS_SECRET, region_name='auto')
+    s3.upload_fileobj(file, BUCKET_NAME, file.name)
+    return file.name
+
 def trigger_runpod(video_name):
     url_run = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/run"
     headers = {"Authorization": f"Bearer {RUNPOD_API_KEY}", "Content-Type": "application/json"}
@@ -33,6 +42,8 @@ def trigger_runpod(video_name):
     job_data = response.json()
     job_id = job_data.get('id')
     
+    if not job_id: return {"error": "Gagal ke RunPod"}
+
     url_status = f"https://api.runpod.ai/v2/{RUNPOD_ENDPOINT_ID}/status/{job_id}"
     while True:
         status_res = requests.get(url_status, headers=headers).json()
@@ -45,8 +56,8 @@ uploaded_file = st.file_uploader("Pilih file video (MP4)", type=['mp4'])
 
 if uploaded_file and st.button("Proses Video Sekarang"):
     with st.spinner("AI sedang memproses klip..."):
-        # (Logika upload R2 di sini tetap seperti sebelumnya)
-        result = trigger_runpod("dummy_filename") # Sederhanakan buat tes
+        filename = upload_to_r2(uploaded_file)
+        result = trigger_runpod(filename)
         
         if result.get("status") == "COMPLETED":
             st.session_state.clips_data = result.get('output', {}).get('viral_clips', {}).get('clips', [])
@@ -57,7 +68,6 @@ if uploaded_file and st.button("Proses Video Sekarang"):
 if st.session_state.clips_data:
     st.success("Video berhasil diproses!")
     for index, clip in enumerate(st.session_state.clips_data):
-        # Generate random score buat UI biar gak kosong
         viral_score = random.randint(85, 99) 
         
         with st.container():
@@ -69,12 +79,11 @@ if st.session_state.clips_data:
             </div>
             """, unsafe_allow_html=True)
             
-            # TOMBOL DOWNLOAD
-            # CATATAN: st.download_button butuh file bytes asli.
-            # Kalau backend belum ngirim file, ini tombol dummy biar gak error.
-            st.download_button(
+            # TOMBOL DOWNLOAD (Menggunakan link asli dari backend)
+            # Kalau clip_url ada, link-nya bakal ngebuka file videonya
+            url = clip.get('clip_url', '#')
+            st.link_button(
                 label=f"📥 Download Klip {index + 1}",
-                data=b"dummy_data", 
-                file_name=f"klip_{index+1}.mp4",
-                key=f"dl_{index}"
+                url=url,
+                help="Klik untuk download video"
             )
