@@ -4,12 +4,13 @@ from google import genai
 from google.genai import types
 
 # Inisialisasi Client
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+# Menggunakan GOOGLE_API_KEY (sesuai settingan RunPod terakhir) atau fallback ke GEMINI_API_KEY
+API_KEY = os.environ.get("GOOGLE_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
-if not GEMINI_API_KEY:
-    raise ValueError("Error: GEMINI_API_KEY tidak ditemukan!")
+if not API_KEY:
+    raise ValueError("Error: API Key tidak ditemukan!")
 
-client = genai.Client(api_key=GEMINI_API_KEY)
+client = genai.Client(api_key=API_KEY)
 
 def analyze_transcription(transcription_data):
     formatted_transcription = ""
@@ -23,11 +24,11 @@ def analyze_transcription(transcription_data):
     {"clips": [{"title": "str", "start_time": float, "end_time": float, "reason": "str"}]}
     """
 
-    print("LOG: Mengirim transkripsi ke Gemini 2.5 Flash...")
+    print("LOG: Mengirim transkripsi ke Gemini 1.5 Flash...")
     
-    # PERUBAHAN FATAL: Menggunakan model aktif terbaru (gemini-2.5-flash)
+    # PERUBAHAN: Downgrade ke 1.5 Flash agar aman dari limit free tier
     response = client.models.generate_content(
-        model='gemini-2.5-flash',
+        model='gemini-1.5-flash',
         contents=f"Transkripsi:\n{formatted_transcription}",
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
@@ -54,5 +55,3 @@ if __name__ == "__main__":
         print(json.dumps(result, indent=2))
     except Exception as e:
         print(f"\nLOG: Error: {e}")
-
-# Tes otomatisasi

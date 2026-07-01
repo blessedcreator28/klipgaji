@@ -2,13 +2,8 @@ import os
 import boto3
 import runpod
 import subprocess
-import google.generativeai as genai
 from faster_whisper import WhisperModel
 from analyzer import analyze_transcription 
-
-# Konfigurasi Google Gemini (Penting untuk mengatasi Limit 429)
-genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
-model_ai = genai.GenerativeModel('gemini-1.5-flash')
 
 # Load Credential R2
 ENDPOINT_URL = os.environ.get("R2_ENDPOINT")
@@ -17,7 +12,7 @@ ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID")
 SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 BUCKET_NAME = os.environ.get("R2_BUCKET")
 
-# Inisialisasi
+# Inisialisasi Whisper dan S3
 model = WhisperModel("small", device="cuda", compute_type="float16")
 s3 = boto3.client("s3", endpoint_url=ENDPOINT_URL, aws_access_key_id=ACCESS_KEY, aws_secret_access_key=SECRET_KEY, region_name="auto")
 
@@ -27,16 +22,19 @@ def cut_and_upload(local_path, start, end, clip_index):
     duration = end - start
     
     try:
+        # 1. FFmpeg
         subprocess.run([
             "ffmpeg", "-y", "-ss", str(start), "-i", local_path, 
             "-t", str(duration), "-c:v", "libx264", "-c:a", "aac", output_path
         ], check=True, capture_output=True, text=True)
         
+        # 2. Upload
         if not os.path.exists(output_path):
-            return "ERROR: File output tidak ditemukan"
+            return "ERROR: File output tidak ditemukan setelah ffmpeg"
             
         s3.upload_file(output_path, BUCKET_NAME, output_filename, ExtraArgs={'ContentType': 'video/mp4'})
         os.remove(output_path)
+        
         return f"{PUBLIC_BUCKET_URL}/{output_filename}"
     
     except subprocess.CalledProcessError as e:
@@ -54,6 +52,8 @@ def handler(event):
 
         segments, _ = model.transcribe(local_path, beam_size=5)
         transcription = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
+        
+        # Murni memanggil analyzer tanpa setting API key lagi di sini
         viral_clips_data = analyze_transcription(transcription)
 
         for clip in viral_clips_data:
