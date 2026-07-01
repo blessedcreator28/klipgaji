@@ -28,7 +28,7 @@ def analyze_transcription(transcription_data):
     
     # PERUBAHAN: Downgrade ke 1.5 Flash agar aman dari limit free tier
     response = client.models.generate_content(
-        model='gemini-1.5-flash',
+        model='gemini-2.5-flash',
         contents=f"Transkripsi:\n{formatted_transcription}",
         config=types.GenerateContentConfig(
             system_instruction=system_instruction,
