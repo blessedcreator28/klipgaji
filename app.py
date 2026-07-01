@@ -17,7 +17,6 @@ if 'clips_data' not in st.session_state:
 
 st.set_page_config(page_title="Jagoan Clipper", layout="centered")
 
-# --- CSS ---
 st.markdown("""
     <style>
     .stApp { background-color: #0f0f0f; color: #ffffff; }
@@ -27,7 +26,6 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNGSI ---
 def upload_to_r2(file):
     s3 = boto3.client('s3', endpoint_url=R2_ENDPOINT, aws_access_key_id=AWS_KEY, aws_secret_access_key=AWS_SECRET, region_name='auto')
     s3.upload_fileobj(file, BUCKET_NAME, file.name)
@@ -50,7 +48,6 @@ def trigger_runpod(video_name):
         if status_res.get('status') in ['COMPLETED', 'FAILED']: return status_res
         time.sleep(5)
 
-# --- UI ---
 st.markdown('<p class="header-text">JAGOAN CLIPPER</p>', unsafe_allow_html=True)
 uploaded_file = st.file_uploader("Pilih file video (MP4)", type=['mp4'])
 
@@ -64,8 +61,11 @@ if uploaded_file and st.button("Proses Video Sekarang"):
         else:
             st.error("Gagal memproses video.")
 
-# Render Klip
+# --- DEBUGGING VIEW ---
 if st.session_state.clips_data:
+    st.write("### Debug Data (Lihat apakah ada 'clip_url'):")
+    st.json(st.session_state.clips_data)
+
     st.success("Video berhasil diproses!")
     for index, clip in enumerate(st.session_state.clips_data):
         viral_score = random.randint(85, 99) 
@@ -79,8 +79,6 @@ if st.session_state.clips_data:
             </div>
             """, unsafe_allow_html=True)
             
-            # TOMBOL DOWNLOAD (Menggunakan link asli dari backend)
-            # Kalau clip_url ada, link-nya bakal ngebuka file videonya
             url = clip.get('clip_url', '#')
             st.link_button(
                 label=f"📥 Download Klip {index + 1}",

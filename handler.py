@@ -8,8 +8,8 @@ from supabase import create_client, Client
 from analyzer import analyze_transcription 
 
 # Load Credential R2
-ENDPOINT_URL = os.environ.get("R2_ENDPOINT") # Pastikan ini URL R2 lo
-PUBLIC_BUCKET_URL = "https://pub-7b62ff616edc4f6aa4a15d2442e2af87.r2.dev" # GANTI INI dengan domain publik R2 lo!
+ENDPOINT_URL = os.environ.get("R2_ENDPOINT")
+PUBLIC_BUCKET_URL = "https://pub-7b62ff616edc4f6aa4a15d2442e2af87.r2.dev"
 ACCESS_KEY = os.environ.get("AWS_ACCESS_KEY_ID")
 SECRET_KEY = os.environ.get("AWS_SECRET_ACCESS_KEY")
 BUCKET_NAME = os.environ.get("R2_BUCKET")
@@ -27,19 +27,28 @@ def cut_and_upload(local_path, start, end, clip_index):
     output_filename = f"clip_{clip_index}.mp4"
     output_path = f"/tmp/{output_filename}"
     
-    # Perintah FFmpeg untuk memotong
+    print(f"DEBUG: Memulai cutting clip_{clip_index} dari {start} ke {end} detik...")
+    
+    # Perintah FFmpeg
     duration = end - start
-    subprocess.run([
-        "ffmpeg", "-y", "-ss", str(start), "-i", local_path, 
-        "-t", str(duration), "-c:v", "libx264", "-c:a", "aac", output_path
-    ], check=True)
+    try:
+        subprocess.run([
+            "ffmpeg", "-y", "-ss", str(start), "-i", local_path, 
+            "-t", str(duration), "-c:v", "libx264", "-c:a", "aac", output_path
+        ], check=True)
+        print(f"DEBUG: FFmpeg berhasil memotong clip_{clip_index}")
+    except subprocess.CalledProcessError as e:
+        print(f"ERROR: FFmpeg gagal memotong clip_{clip_index}: {e}")
+        return None
     
     # Upload ke R2
+    print(f"DEBUG: Mengupload clip_{clip_index} ke R2...")
     s3.upload_file(output_path, BUCKET_NAME, output_filename, ExtraArgs={'ContentType': 'video/mp4'})
     os.remove(output_path)
     
-    # Return URL Publik yang valid
-    return f"{PUBLIC_BUCKET_URL}/{output_filename}"
+    url = f"{PUBLIC_BUCKET_URL}/{output_filename}"
+    print(f"DEBUG: Upload sukses, URL: {url}")
+    return url
 
 def handler(event):
     job_input = event.get("input", {})
@@ -53,4 +62,27 @@ def handler(event):
 
         segments, _ = model.transcribe(local_path, beam_size=5)
         transcription = [{"start": s.start, "end": s.end, "text": s.text} for s in segments]
-        viral
+        viral_clips_data = analyze_transcription(transcription)
+
+        final_clips = []
+        for i, clip in enumerate(viral_clips_data):
+            print(f"DEBUG: Memproses klip indeks {i}")
+            clip_url = cut_and_upload(local_path, clip['start_time'], clip['end_time'], i)
+            
+            if clip_url:
+                clip['clip_url'] = clip_url 
+            else:
+                clip['clip_url'] = "ERROR_CUTTING" # Flag kalau gagal
+            
+            final_clips.append(clip)
+
+        if os.path.exists(local_path): os.remove(local_path)
+
+        return {"status": "success", "viral_clips": {"clips": final_clips}}
+
+    except Exception as e:
+        print(f"CRITICAL ERROR: {e}")
+        return {"status": "error", "message": str(e)}
+
+if __name__ == "__main__":
+    runpod.serverless.start({"handler": handler})
