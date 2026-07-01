@@ -1,4 +1,4 @@
-# Gunakan image resmi NVIDIA yang sudah include semua library CUDA
+# Gunakan image resmi NVIDIA
 FROM nvidia/cuda:12.1.1-runtime-ubuntu22.04
 
 # Install python dan dependencies
@@ -8,16 +8,16 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Install library Python dari requirements.txt
+# Buat folder kerja
+WORKDIR /app
+
+# Install library Python
 COPY requirements.txt .
 RUN pip3 install --no-cache-dir -r requirements.txt
-
-# Install google-genai secara eksplisit untuk memastikan library "otak" terpasang
 RUN pip3 install --no-cache-dir google-genai
 
-# Copy handler dan analyzer (otak AI) ke dalam container
-COPY handler.py .
-COPY analyzer.py .
+# Copy source code ke /app
+COPY . .
 
-# Jalankan
+# Jalankan dari folder /app
 CMD ["python3", "handler.py"]
