@@ -2,3 +2,4 @@ runpod
 boto3
 faster-whisper
 ctranslate2
+supabase
